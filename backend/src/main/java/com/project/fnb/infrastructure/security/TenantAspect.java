@@ -2,10 +2,14 @@ package com.project.fnb.infrastructure.security;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import lombok.extern.slf4j.Slf4j;
+
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.hibernate.Session;
 import org.springframework.stereotype.Component;
+
+import com.project.fnb.common.BaseEntity;
 
 /**
  * Aspect để tự động kích hoạt Hibernate Filter cho tenant isolation trong các repository calls.
@@ -70,6 +74,7 @@ import org.springframework.stereotype.Component;
  */
 @Aspect
 @Component
+@Slf4j
 public class TenantAspect {
 
     /**
@@ -151,7 +156,9 @@ public class TenantAspect {
     @Before("execution(* com.project.fnb.modules..repository..*.*(..))")
     public void enableTenantFilter() {
         String tenantId = TenantContext.getTenantId();
-        
+
+        log.info("AOP Checking Tenant: {}", tenantId);
+
         if (tenantId != null) {
             Session session = entityManager.unwrap(Session.class);
             session.enableFilter("tenantFilter")

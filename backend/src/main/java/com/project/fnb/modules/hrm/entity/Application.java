@@ -22,6 +22,10 @@ public class Application extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "job_post_id", nullable = false)
+    private JobPost jobPost;
+
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     @Builder.Default

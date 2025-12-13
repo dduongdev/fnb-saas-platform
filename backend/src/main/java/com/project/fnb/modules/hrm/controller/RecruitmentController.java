@@ -23,7 +23,7 @@ public class RecruitmentController {
     public ApiResponse<String> applyJob(@AuthenticationPrincipal Jwt jwt, 
                                         @RequestBody @Valid ApplyRequest request) {
         String userId = jwt.getSubject();
-        recruitmentService.applyToTenant(userId, request);
+        recruitmentService.applyToJob(userId, request);
         return ApiResponse.success("Đã gửi đơn ứng tuyển thành công!");
     }
 }
