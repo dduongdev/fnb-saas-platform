@@ -1,5 +1,6 @@
 package com.project.fnb.infrastructure.storage;
 
+import com.project.fnb.common.exception.AppException;
 import com.project.fnb.infrastructure.security.TenantContext;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
@@ -193,7 +194,7 @@ public class StorageService {
      */
     public String uploadTenantImage(MultipartFile file) {
         String tenantId = TenantContext.getTenantId();
-        if (tenantId == null) throw new RuntimeException("Tenant ID missing");
+        if (tenantId == null) throw new AppException(400, "Tenant ID missing");
         String bucketName = "tenant-" + tenantId.toLowerCase() + "-assets";
         return uploadFile(bucketName, file, "images/");
     }

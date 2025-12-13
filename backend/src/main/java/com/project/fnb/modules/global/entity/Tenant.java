@@ -36,6 +36,9 @@ public class Tenant {
     @Builder.Default
     private Boolean isActive = true;
 
+    @Column(name = "logo_url", length = 500)
+    private String logoUrl;
+
     @CreationTimestamp
     @Column(name = "created_at")
     private LocalDateTime createdAt;
