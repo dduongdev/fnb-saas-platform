@@ -1,5 +1,7 @@
 package com.project.fnb.modules.global.service;
 
+import com.project.fnb.common.exception.AppException;
+import com.project.fnb.infrastructure.storage.StorageService;
 import com.project.fnb.modules.global.dto.UserResponse;
 import com.project.fnb.modules.global.entity.User;
 import com.project.fnb.modules.global.repository.UserRepository;
@@ -7,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Dịch vụ quản lý thông tin người dùng trong hệ thống.
@@ -36,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final StorageService storageService;
 
     /**
      * Đồng bộ thông tin người dùng từ JWT token OAuth2/Keycloak.
@@ -98,5 +102,20 @@ public class UserService {
                 .trustScore(savedUser.getTrustScore())
                 .phone(savedUser.getPhone())
                 .build();
+    }
+
+    @Transactional
+    public String updateAvatar(String userId, MultipartFile file) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(404, "User not found"));
+
+        String avatarUrl = storageService.uploadUserProfileImage(file);
+
+        if (user.getAvatarUrl() != null) storageService.deleteFile(user.getAvatarUrl());
+
+        user.setAvatarUrl(avatarUrl);
+        userRepository.save(user);
+
+        return avatarUrl;
     }
 }
