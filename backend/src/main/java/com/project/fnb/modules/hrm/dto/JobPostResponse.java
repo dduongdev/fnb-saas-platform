@@ -11,6 +11,8 @@ public class JobPostResponse {
     private String title;
     private String description;
     private Boolean isActive;
+    private String tenantName; 
+    private String tenantLogo; 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
