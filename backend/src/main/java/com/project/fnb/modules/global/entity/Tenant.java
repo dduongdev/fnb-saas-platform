@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
+import com.project.fnb.modules.global.dto.PaymentConfigDto;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -29,9 +31,6 @@ public class Tenant {
     @Column(name = "owner_id", length = 64)
     private String ownerId; 
 
-    @Column(name = "payment_config", columnDefinition = "JSON")
-    private String paymentConfig;
-
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;
@@ -42,4 +41,8 @@ public class Tenant {
     @CreationTimestamp
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    @Column(name = "payment_config", columnDefinition = "LONGTEXT")
+    @Convert(converter = PaymentConfigConverter.class) 
+    private PaymentConfigDto paymentConfig;
 }

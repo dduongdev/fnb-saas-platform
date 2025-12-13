@@ -25,13 +25,26 @@ spring:
     username: ${RABBITMQ_USER}
     password: ${RABBITMQ_PASS}
 
-  # 3. Keycloak
   security:
     oauth2:
       resourceserver:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI}
           jwk-set-uri: ${KEYCLOAK_JWK_SET_URI}
+  
+keycloak:
+  admin:
+    client-id: ${KEYCLOAK_ADMIN_CLIENT_ID}
+    client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
+
+app:
+  security:
+    aes-secret: ${APP_AES_SECRET}
+
+  payment:
+    vnpay:
+      api-url: ${VNPAY_API_URL}
+      return-url: ${VNPAY_RETURN_URL}
 
 # 4. MinIO (Custom)
 minio:

@@ -2,6 +2,7 @@ package com.project.fnb.modules.global.controller;
 
 import com.project.fnb.common.dto.ApiResponse;
 import com.project.fnb.modules.global.dto.CreateTenantRequest;
+import com.project.fnb.modules.global.dto.PaymentConfigDto;
 import com.project.fnb.modules.global.dto.UpdateTenantRequest;
 import com.project.fnb.modules.global.entity.Tenant;
 import com.project.fnb.modules.global.service.TenantService;
@@ -148,5 +149,16 @@ public class TenantController {
         String userId = jwt.getSubject();
         tenantService.updateTenantStatus(id, isActive, userId);
         return ApiResponse.success("Cập nhật trạng thái thành công");
+    }
+
+    @PutMapping("/{id}/payment-config")
+    public ApiResponse<String> updatePaymentConfig(
+            @PathVariable String id,
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody PaymentConfigDto config
+    ) {
+        String userId = jwt.getSubject();
+        tenantService.updatePaymentConfig(id, config, userId);
+        return ApiResponse.success("Cập nhật cấu hình thanh toán thành công");
     }
 }

@@ -1,9 +1,11 @@
 package com.project.fnb.modules.global.service;
 
 import com.project.fnb.common.exception.AppException;
+import com.project.fnb.infrastructure.security.IdentityService;
 import com.project.fnb.infrastructure.security.TenantContext;
 import com.project.fnb.infrastructure.storage.StorageService;
 import com.project.fnb.modules.global.dto.CreateTenantRequest;
+import com.project.fnb.modules.global.dto.PaymentConfigDto;
 import com.project.fnb.modules.global.dto.UpdateTenantRequest; // Nhớ tạo DTO này
 import com.project.fnb.modules.global.entity.Tenant;
 import com.project.fnb.modules.global.repository.TenantRepository;
@@ -67,7 +69,8 @@ public class TenantService {
     private final TenantRepository tenantRepository;
     private final MinioClient minioClient;
     private final CategoryService categoryService;
-    private final StorageService storageService; // Inject thêm StorageService
+    private final StorageService storageService;
+    private final IdentityService identityService;
 
     /**
      * Tạo mới tenant (quán hàng) với bucket MinIO riêng, logo, và category mặc định.
@@ -156,6 +159,7 @@ public class TenantService {
             else TenantContext.clear();
         }
 
+        identityService.createTenantGroup(tenant.getId());
         return tenant;
     }
 
@@ -378,6 +382,19 @@ public class TenantService {
         }
 
         tenant.setIsActive(status);
+        tenantRepository.save(tenant);
+    }
+
+    @Transactional
+    public void updatePaymentConfig(String tenantId, PaymentConfigDto config, String userId) {
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new AppException(404, "Quán không tồn tại"));
+
+        if (!tenant.getOwnerId().equals(userId)) {
+            throw new AppException(403, "Không có quyền");
+        }
+
+        tenant.setPaymentConfig(config);
         tenantRepository.save(tenant);
     }
 }
