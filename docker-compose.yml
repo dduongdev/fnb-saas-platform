@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  # ------------------------------------
+  # 1. INFRASTRUCTURE SERVICES
+  # ------------------------------------
+  mysql-db:
+    image: mysql:8.0
+    container_name: fnb-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: fnb_db
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - fnb-net
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0.0
+    container_name: fnb-keycloak
+    command: start-dev
+    environment:
+      KC_DB: dev-file
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 8080
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_RELATIVE_PATH: "/"
+    ports:
+      - "8080:8080"
+    networks:
+      - fnb-net
+
+  minio:
+    image: minio/minio:latest
+    container_name: fnb-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - fnb-net
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: fnb-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - fnb-net
+
+  # ------------------------------------
+  # 2. APP BACKEND SERVICE
+  # ------------------------------------
+  backend:
+    container_name: fnb-backend
+    build:
+      context: ./backend 
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    env_file:
+      - .env 
+    networks:
+      - fnb-net
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      minio:
+        condition: service_started
+
+volumes:
+  mysql_data:
+  minio_data:
+
+networks:
+  fnb-net:
+    driver: bridge
