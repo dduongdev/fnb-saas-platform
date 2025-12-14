@@ -32,4 +32,9 @@ public interface JobPostRepository extends JpaRepository<JobPost, Long> {
     @NonNull
     @Query("SELECT j FROM JobPost j WHERE j.id = :id")
     Optional<JobPost> findById(@NonNull @Param("id") Long id);
+
+    @Query(value = "SELECT * FROM job_posts WHERE is_active = true AND is_deleted = false ORDER BY created_at DESC", 
+           countQuery = "SELECT count(*) FROM job_posts WHERE is_active = true AND is_deleted = false",
+           nativeQuery = true)
+    Page<JobPost> findAllPublicJobs(Pageable pageable);
 }

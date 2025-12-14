@@ -2,6 +2,9 @@ package com.project.fnb.infrastructure.security;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.List;
+
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.representations.idm.GroupRepresentation;
@@ -191,5 +194,48 @@ public class IdentityService {
             log.error("Keycloak: Failed to create group. Status: {}", response.getStatus());
         }
         response.close();
+    }
+
+    public void addUserToGroup(String userId, String tenantId) {
+        String groupName = "tenant_" + tenantId + "_staff";
+
+        try {
+            List<GroupRepresentation> groups = getRealm().groups().groups(groupName, 0, 1);
+
+            if (groups.isEmpty()) {
+                log.error("Keycloak: Group '{}' not found. Tenant ID: {}", groupName, tenantId);
+                throw new RuntimeException("Lỗi hệ thống: Không tìm thấy nhóm quyền của quán.");
+            }
+
+            String groupId = groups.get(0).getId();
+
+            getRealm().users().get(userId).joinGroup(groupId);
+
+            log.info("Keycloak: Added user {} to group {}", userId, groupName);
+
+        } catch (Exception e) {
+            log.error("Keycloak: Failed to add user {} to group {}", userId, groupName, e);
+            throw new RuntimeException("Lỗi hệ thống: Không thể cấp quyền cho nhân viên trên hệ thống định danh.");
+        }
+    }
+
+    public void removeUserFromGroup(String userId, String tenantId) {
+        String groupName = "tenant_" + tenantId + "_staff";
+
+        try {
+            List<GroupRepresentation> groups = getRealm().groups().groups(groupName, 0, 1);
+            if (groups.isEmpty()) {
+                log.warn("Keycloak: Group '{}' not found while trying to remove user. Skipping.", groupName);
+                return; 
+            }
+            String groupId = groups.get(0).getId();
+
+            getRealm().users().get(userId).leaveGroup(groupId);
+            
+            log.info("Keycloak: Removed user {} from group {}", userId, groupName);
+        } catch (Exception e) {
+            log.error("Keycloak: Failed to remove user {} from group {}", userId, groupName, e);
+            throw new RuntimeException("Lỗi hệ thống: Không thể thu hồi quyền của nhân viên.");
+        }
     }
 }

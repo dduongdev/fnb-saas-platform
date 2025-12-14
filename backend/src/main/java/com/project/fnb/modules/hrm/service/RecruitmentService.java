@@ -4,13 +4,17 @@ import com.project.fnb.common.exception.AppException;
 import com.project.fnb.infrastructure.security.TenantContext;
 import com.project.fnb.modules.global.entity.User;
 import com.project.fnb.modules.global.repository.UserRepository;
+import com.project.fnb.modules.hrm.dto.ApplicationResponse;
 import com.project.fnb.modules.hrm.dto.ApplyRequest;
 import com.project.fnb.modules.hrm.entity.Application;
+import com.project.fnb.modules.hrm.entity.Employee;
 import com.project.fnb.modules.hrm.entity.JobPost;
 import com.project.fnb.modules.hrm.repository.ApplicationRepository;
 import com.project.fnb.modules.hrm.repository.JobPostRepository;
 
 import lombok.RequiredArgsConstructor;
+
+import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,6 +72,7 @@ public class RecruitmentService {
     private final ApplicationRepository applicationRepository;
     private final UserRepository userRepository;
     private final JobPostRepository jobPostRepository;
+    private final StaffService staffService;
 
     @Transactional
     public void applyToJob(String userId, ApplyRequest request) {
@@ -110,5 +115,42 @@ public class RecruitmentService {
     private String getTenantIdByJobPostId(Long jobPostId) {
         return jobPostRepository.findTenantIdById(jobPostId)
                 .orElseThrow(() -> new AppException(404, "Tin tuyển dụng không tồn tại hoặc đã bị xóa"));
+    }
+
+    public List<ApplicationResponse> getApplicationsByJob(Long jobId) {
+        return applicationRepository.findAll().stream()
+                .filter(app -> app.getJobPost().getId().equals(jobId)) 
+                .map(this::mapToAppResponse)
+                .toList();
+    }
+
+    @Transactional
+    public void processApplication(Integer applicationId, Application.Status newStatus) {
+        Application app = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new AppException(404, "Đơn ứng tuyển không tồn tại"));
+
+        if (app.getStatus() != Application.Status.PENDING) {
+            throw new AppException(400, "Đơn này đã được xử lý trước đó");
+        }
+
+        app.setStatus(newStatus);
+        applicationRepository.save(app);
+
+        if (newStatus == Application.Status.APPROVED) {
+            staffService.createEmployeeFromUser(app.getUser().getId(), Employee.Role.STAFF);
+        }
+    }
+
+    private ApplicationResponse mapToAppResponse(Application app) {
+        return ApplicationResponse.builder()
+                .id(app.getId())
+                .candidateName(app.getUser().getFullName())
+                .candidateEmail(app.getUser().getEmail())
+                .candidateAvatar(app.getUser().getAvatarUrl())
+                .candidatePhone(app.getUser().getPhone())
+                .message(app.getMessage())
+                .status(app.getStatus())
+                .createdAt(app.getCreatedAt())
+                .build();
     }
 }

@@ -6,62 +6,50 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
 import java.io.IOException;
 
-/**
- * Bộ lọc (Filter) để xử lý thông tin Tenant từ HTTP request headers.
- * 
- * <p>Class này chịu trách nhiệm trích xuất Tenant ID từ header "X-Tenant-ID"
- * trong mỗi HTTP request và thiết lập nó vào TenantContext để sử dụng trong
- * toàn bộ xử lý của request đó. Sau khi request được xử lý xong, TenantContext
- * sẽ được làm sạch để tránh rò rỉ dữ liệu giữa các request khác nhau.</p>
- * 
- * <p>Đây là một phần của chiến lược multi-tenancy, cho phép một instance ứng dụng
- * phục vụ nhiều khách hàng (tenant) khác nhau.</p>
- * 
- * @author Project Team
- * @version 1.0
- */
 @Component
 public class TenantFilter implements Filter {
 
-    /**
-     * Tên của HTTP header sử dụng để truyền Tenant ID.
-     * Giá trị: "X-Tenant-ID"
-     */
     private static final String TENANT_HEADER = "X-Tenant-ID";
 
-    /**
-     * Thực hiện lọc HTTP request để trích xuất và thiết lập Tenant ID.
-     * 
-     * <p>Phương thức này:</p>
-     * <ul>
-     *   <li>Lấy giá trị Tenant ID từ header "X-Tenant-ID"</li>
-     *   <li>Nếu Tenant ID không rỗng, thiết lập nó vào TenantContext</li>
-     *   <li>Truyền request đến filter tiếp theo trong chuỗi</li>
-     *   <li>Xóa sạch TenantContext sau khi xử lý xong (trong block finally)</li>
-     * </ul>
-     * 
-     * @param request  {@link ServletRequest} - đối tượng request HTTP
-     * @param response {@link ServletResponse} - đối tượng response HTTP
-     * @param chain    {@link FilterChain} - chuỗi các filter để tiếp tục xử lý
-     * 
-     * @throws IOException      nếu xảy ra lỗi I/O trong quá trình xử lý
-     * @throws ServletException nếu xảy ra lỗi Servlet trong quá trình xử lý
-     */
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
         
         HttpServletRequest req = (HttpServletRequest) request;
+        HttpServletResponse res = (HttpServletResponse) response;
 
+        // 1. Lấy URI của request
+        String path = req.getRequestURI();
+
+        // 2. Định nghĩa các URL không cần Tenant Context
+        if (path.startsWith("/api/public/") || 
+            path.startsWith("/api/auth/") ||
+            path.startsWith("/api/recruitment/") || 
+            path.startsWith("/api/profile/")
+        ) {
+            
+            chain.doFilter(request, response);
+            return; // Cho qua và không xử lý Tenant nữa
+        }
+        
+        // --- LOGIC BẮT BUỘC ---
+        // 3. Nếu là API nghiệp vụ, phải có Header
         String tenantId = req.getHeader(TENANT_HEADER);
 
-        if (tenantId != null && !tenantId.isBlank()) {
-            TenantContext.setTenantId(tenantId);
+        if (tenantId == null || tenantId.isBlank()) {
+            // Ném lỗi ngay lập tức
+            res.setStatus(HttpServletResponse.SC_FORBIDDEN); // 403 Forbidden
+            res.setContentType("application/json");
+            res.getWriter().write("{\"code\": 403, \"message\": \"Access Denied: Missing X-Tenant-ID header\"}");
+            return; // Chặn request
         }
 
+        // 4. Nếu hợp lệ, set Context và tiếp tục
+        TenantContext.setTenantId(tenantId);
         try {
             chain.doFilter(request, response);
         } finally {
