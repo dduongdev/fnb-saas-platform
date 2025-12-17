@@ -47,6 +47,9 @@ app:
       api-url: ${VNPAY_API_URL}
       return-url: ${VNPAY_RETURN_URL}
 
+  frontend:
+    url: ${APP_FRONTEND_URL}
+
 # 4. MinIO (Custom)
 minio:
   url: ${MINIO_URL}

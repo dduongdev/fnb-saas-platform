@@ -1,7 +1,9 @@
 package com.project.fnb.modules.pos.service;
 
 import com.project.fnb.common.exception.AppException;
+import com.project.fnb.common.utils.QrCodeUtils;
 import com.project.fnb.infrastructure.security.TenantContext;
+import com.project.fnb.infrastructure.storage.StorageService;
 import com.project.fnb.modules.pos.dto.MergeTableRequest;
 import com.project.fnb.modules.pos.dto.TableDto;
 import com.project.fnb.modules.pos.entity.DiningTable;
@@ -9,10 +11,12 @@ import com.project.fnb.modules.pos.repository.TableRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.HashSet;
 import java.util.List;
@@ -42,6 +46,11 @@ public class TableService {
     private final TableRepository tableRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
+    private final StorageService storageService;
+
+    @Value("${app.frontend.url}") 
+    private String frontendUrl;
+
     /**
      * Create a new dining table record.
      *
@@ -52,18 +61,33 @@ public class TableService {
      * @implNote this method triggers an async WebSocket notification by calling {@link #notifyTableUpdate()}.
      */
     @Transactional
-    public TableDto createTable(String name) {
-        DiningTable table = DiningTable.builder()
-                .name(name)
-                .status(DiningTable.Status.AVAILABLE)
-                .build();
-        
-        DiningTable savedTable = tableRepository.save(table);
-        // QR generation may be implemented in a later phase; current flow persists and notifies clients
-        notifyTableUpdate();
-        
-        return mapToDto(savedTable);
-    }
+        public TableDto createTable(String name) {
+            DiningTable table = DiningTable.builder()
+                    .name(name)
+                    .status(DiningTable.Status.AVAILABLE)
+                    .build();
+            
+            // Lưu lần 1 để lấy ID
+            table = tableRepository.save(table);
+
+            // Generate QR Code
+            String tenantId = TenantContext.getTenantId();
+            // URL mà khách sẽ quét: http://localhost:3000/menu/uuid-tenant/1
+            String qrContent = String.format("%s/menu/%s/%d", frontendUrl, tenantId, table.getId());
+            
+            // Tạo ảnh
+            MultipartFile qrFile = QrCodeUtils.generateQrCodeImage(qrContent, 300, 300);
+            
+            // Upload lên MinIO (Sử dụng hàm uploadTenantImage để chung bucket với quán)
+            String qrUrl = storageService.uploadTenantImage(qrFile);
+            
+            // Update lại URL vào DB
+            table.setQrCodeUrl(qrUrl);
+            tableRepository.save(table);
+
+            notifyTableUpdate();
+            return mapToDto(table);
+        }
 
     // 2. Lấy danh sách bàn (Hiển thị UI)
     public List<TableDto> getTables() {

@@ -422,7 +422,7 @@ public class TenantService {
     }
 
     @Transactional
-    public void updatePaymentConfig(String tenantId, PaymentConfigDto config, String userId) {
+    public void updatePaymentConfig(String tenantId, PaymentConfigDto requestConfig, String userId) {
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new AppException(404, "Quán không tồn tại"));
 
@@ -430,7 +430,42 @@ public class TenantService {
             throw new AppException(403, "Không có quyền");
         }
 
-        tenant.setPaymentConfig(config);
+        PaymentConfigDto currentConfig = tenant.getPaymentConfig();
+        if (currentConfig == null) {
+            currentConfig = new PaymentConfigDto();
+        }
+
+        // 1. Cập nhật & Validate VNPay
+        if (requestConfig.getVnpay() != null) {
+            PaymentConfigDto.VNPayConfig vnpReq = requestConfig.getVnpay();
+            
+            // Nếu bật (Enabled = true), bắt buộc phải có TmnCode và Secret
+            if (Boolean.TRUE.equals(vnpReq.getEnabled())) {
+                if (isEmpty(vnpReq.getTmnCode()) || isEmpty(vnpReq.getHashSecret())) {
+                    throw new AppException(400, "Vui lòng nhập đầy đủ TmnCode và HashSecret để kích hoạt VNPay.");
+                }
+            }
+            currentConfig.setVnpay(vnpReq);
+        }
+
+        // 2. Cập nhật & Validate Momo (Tương tự)
+        if (requestConfig.getMomo() != null) {
+            PaymentConfigDto.MomoConfig momoReq = requestConfig.getMomo();
+            
+            if (Boolean.TRUE.equals(momoReq.getEnabled())) {
+                if (isEmpty(momoReq.getPartnerCode()) || isEmpty(momoReq.getAccessKey()) || isEmpty(momoReq.getSecretKey())) {
+                    throw new AppException(400, "Vui lòng nhập đầy đủ thông tin kết nối Momo.");
+                }
+            }
+            currentConfig.setMomo(momoReq);
+        }
+
+        // Lưu
+        tenant.setPaymentConfig(currentConfig);
         tenantRepository.save(tenant);
+    }
+
+    private boolean isEmpty(String str) {
+        return str == null || str.trim().isEmpty();
     }
 }

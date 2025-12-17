@@ -294,4 +294,31 @@ public class OrderService {
             return null;
         }
     }
+
+    public void notifyPaymentSuccess(Order order) {
+        String tenantId = order.getTenantId(); // Lưu ý: Lúc này Context đã được set trong Controller
+        
+        // 1. Sync Data: Báo cho màn hình bàn đó biết là đã thanh toán xong (để reset giao diện)
+        // Topic: /topic/tenant/{id}/table/{tableId}
+        // Gửi OrderResponse mới nhất (đã COMPLETED)
+        notifyTableUpdate(order); 
+
+        // 2. Alert: Báo cho nhân viên biết tiền đã về
+        // Topic: /topic/tenant/{id}/notifications
+        String content = String.format("Đơn hàng #%d tại Bàn %s đã thanh toán thành công qua VNPay (%s)", 
+                order.getId(), 
+                order.getTable().getName(), 
+                order.getTotalAmount());
+
+        NotificationMessage msg = NotificationMessage.builder()
+                .type("PAYMENT_SUCCESS")
+                .title("Thanh toán thành công")
+                .content(content)
+                .tableId(order.getTable().getId())
+                .tableName(order.getTable().getName())
+                .build();
+
+        String notificationTopic = "/topic/tenant/" + tenantId + "/notifications";
+        messagingTemplate.convertAndSend(notificationTopic, msg);
+    }
 }

@@ -18,4 +18,10 @@ public interface CategoryRepository extends JpaRepository<Category, Integer> {
     @NonNull
     @Query("SELECT c FROM Category c WHERE c.id = :id")
     Optional<Category> findById(@NonNull @Param("id") Integer id);
+
+    @Query("SELECT DISTINCT c FROM Category c " +
+           "LEFT JOIN FETCH c.products p " +
+           "WHERE c.isActive = true " +
+           "ORDER BY c.displayOrder ASC")
+    List<Category> findAllWithProducts();
 }
