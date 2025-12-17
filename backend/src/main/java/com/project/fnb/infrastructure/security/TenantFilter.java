@@ -29,7 +29,8 @@ public class TenantFilter implements Filter {
         if (path.startsWith("/api/public/") || 
             path.startsWith("/api/auth/") ||
             path.startsWith("/api/recruitment/") || 
-            path.startsWith("/api/profile/")
+            path.startsWith("/api/profile/") || 
+            path.startsWith("/api/tenants")
         ) {
             
             chain.doFilter(request, response);
