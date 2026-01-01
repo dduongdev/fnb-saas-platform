@@ -1,4 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { Client } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
 import { useTenant } from '../context/TenantContext';
 
 /**
@@ -6,116 +8,80 @@ import { useTenant } from '../context/TenantContext';
  * 
  * Backend uses STOMP over SockJS with Spring WebSocketMessageBroker.
  * Topics:
+ * - /topic/tenant/{tenantId}/session/{sessionId} - Session updates
  * - /topic/tenant/{tenantId}/table/{tableId} - Session updates for a table
  * - /topic/tenant/{tenantId}/tables - All tables update
  * - /topic/tenant/{tenantId}/pending-sessions - Pending sessions for staff
  * - /topic/tenant/{tenantId}/notifications - General notifications
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
 /**
- * Create STOMP client using native WebSocket fallback
- * Note: For production, use sockjs-client + @stomp/stompjs packages
+ * Create STOMP client using SockJS
  */
-function createStompConnection(url, subscriptions, onConnect, onError) {
-    let ws = null;
-    let connected = false;
-    let subscriptionId = 0;
-
-    // Simple STOMP frame parser/builder
-    const buildFrame = (command, headers = {}, body = '') => {
-        let frame = command + '\n';
-        Object.keys(headers).forEach(key => {
-            frame += `${key}:${headers[key]}\n`;
-        });
-        frame += '\n' + body + '\0';
-        return frame;
-    };
-
-    const parseFrame = (data) => {
-        const lines = data.split('\n');
-        const command = lines[0];
-        const headers = {};
-        let i = 1;
-        while (i < lines.length && lines[i] !== '') {
-            const [key, ...value] = lines[i].split(':');
-            headers[key] = value.join(':');
-            i++;
-        }
-        const body = lines.slice(i + 1).join('\n').replace(/\0$/, '');
-        return { command, headers, body };
-    };
-
-    const connect = () => {
-        try {
-            // Use SockJS transport simulation or plain WebSocket
-            const wsUrl = url.replace('http', 'ws');
-            ws = new WebSocket(wsUrl);
-
-            ws.onopen = () => {
-                // Send CONNECT frame
-                ws.send(buildFrame('CONNECT', {
-                    'accept-version': '1.1,1.0',
-                    'heart-beat': '10000,10000'
-                }));
-            };
-
-            ws.onmessage = (event) => {
-                const frame = parseFrame(event.data);
-
-                if (frame.command === 'CONNECTED') {
-                    connected = true;
-                    // Subscribe to all topics
-                    subscriptions.forEach(({ destination, callback }) => {
-                        ws.send(buildFrame('SUBSCRIBE', {
-                            id: `sub-${subscriptionId++}`,
-                            destination
-                        }));
-                    });
-                    if (onConnect) onConnect();
-                }
-
-                if (frame.command === 'MESSAGE') {
-                    const sub = subscriptions.find(s => s.destination === frame.headers.destination);
-                    if (sub && sub.callback) {
-                        try {
-                            const data = JSON.parse(frame.body);
-                            sub.callback(data);
-                        } catch (e) {
-                            console.error('[STOMP] Parse error:', e);
-                        }
+function createStompClient(url, subscriptions, onConnect, onError) {
+    const client = new Client({
+        // Use SockJS for connection
+        webSocketFactory: () => new SockJS(url),
+        
+        // Connection options
+        connectHeaders: {},
+        
+        // Heartbeat (10 seconds)
+        heartbeatIncoming: 10000,
+        heartbeatOutgoing: 10000,
+        
+        // Reconnect settings
+        reconnectDelay: 3000,
+        
+        // Debug output
+        debug: (str) => {
+            console.log('[STOMP Debug]', str);
+        },
+        
+        // On successful connection
+        onConnect: (frame) => {
+            console.log('[STOMP] Connected:', frame);
+            
+            // Subscribe to all topics
+            subscriptions.forEach(({ destination, callback }) => {
+                client.subscribe(destination, (message) => {
+                    try {
+                        const data = JSON.parse(message.body);
+                        callback(data);
+                    } catch (e) {
+                        console.error('[STOMP] Parse error:', e);
                     }
-                }
-            };
-
-            ws.onclose = () => {
-                connected = false;
-                // Auto-reconnect after 3 seconds
-                setTimeout(connect, 3000);
-            };
-
-            ws.onerror = (error) => {
-                if (onError) onError(error);
-            };
-        } catch (error) {
-            console.error('[STOMP] Connection error:', error);
+                });
+                console.log('[STOMP] Subscribed to:', destination);
+            });
+            
+            if (onConnect) onConnect();
+        },
+        
+        // On connection error
+        onStompError: (frame) => {
+            console.error('[STOMP] Error:', frame);
+            if (onError) onError(frame);
+        },
+        
+        // On WebSocket error
+        onWebSocketError: (event) => {
+            console.error('[WS] Error:', event);
+            if (onError) onError(event);
+        },
+        
+        // On disconnect
+        onDisconnect: () => {
+            console.log('[STOMP] Disconnected');
         }
-    };
-
-    const disconnect = () => {
-        if (ws) {
-            if (connected) {
-                ws.send(buildFrame('DISCONNECT'));
-            }
-            ws.close();
-            ws = null;
-        }
-    };
-
-    connect();
-
-    return { disconnect };
+    });
+    
+    // Activate the client
+    client.activate();
+    
+    return client;
 }
 
 /**
@@ -130,10 +96,11 @@ function createStompConnection(url, subscriptions, onConnect, onError) {
  * - ORDER_ITEM_UPDATED: Item quantity updated
  */
 export function useSessionWebSocket(tableId, onSessionUpdate, onItemEvent) {
-    const { currentTenant } = useTenant();
-    const connectionRef = useRef(null);
+    const { tenant } = useTenant();
+    const clientRef = useRef(null);
 
     const handleMessage = useCallback((data) => {
+        console.log('[WS] Received message:', data);
         // Check if it's an event-based message
         if (data.type && ['ORDER_ITEM_ADDED', 'ORDER_ITEM_DELETED', 'ORDER_ITEM_SERVED', 'ORDER_ITEM_UPDATED'].includes(data.type)) {
             // Event-based update
@@ -149,17 +116,17 @@ export function useSessionWebSocket(tableId, onSessionUpdate, onItemEvent) {
     }, [onSessionUpdate, onItemEvent]);
 
     useEffect(() => {
-        if (!currentTenant?.id || !tableId) return;
+        if (!tenant?.id || !tableId) return;
 
         const wsUrl = `${API_BASE_URL}/ws`;
         const subscriptions = [
             {
-                destination: `/topic/tenant/${currentTenant.id}/table/${tableId}`,
+                destination: `/topic/tenant/${tenant.id}/table/${tableId}`,
                 callback: handleMessage
             }
         ];
 
-        connectionRef.current = createStompConnection(
+        clientRef.current = createStompClient(
             wsUrl,
             subscriptions,
             () => console.log('[WS] Session subscription active'),
@@ -167,22 +134,183 @@ export function useSessionWebSocket(tableId, onSessionUpdate, onItemEvent) {
         );
 
         return () => {
-            if (connectionRef.current) {
-                connectionRef.current.disconnect();
+            if (clientRef.current) {
+                clientRef.current.deactivate();
             }
         };
-    }, [currentTenant?.id, tableId, handleMessage]);
+    }, [tenant?.id, tableId, handleMessage]);
 }
 
 /**
  * Hook for session real-time updates by sessionId
  * Use this when you have sessionId but not tableId
  */
-export function useSessionByIdWebSocket(sessionId, onSessionUpdate, onItemEvent) {
-    const { currentTenant } = useTenant();
-    const connectionRef = useRef(null);
+export function useSessionByIdWebSocket(sessionId, onSessionUpdate, onItemEvent, tenantIdOverride = null) {
+    const { tenant } = useTenant();
+    const clientRef = useRef(null);
 
     const handleMessage = useCallback((data) => {
+        console.log('[WS ByID] Received message:', data);
+        if (data.type && ['ORDER_ITEM_ADDED', 'ORDER_ITEM_DELETED', 'ORDER_ITEM_SERVED', 'ORDER_ITEM_UPDATED'].includes(data.type)) {
+            if (onItemEvent) {
+                onItemEvent(data);
+            }
+        } else {
+            if (onSessionUpdate) {
+                onSessionUpdate(data);
+            }
+        }
+    }, [onSessionUpdate, onItemEvent]);
+
+    const activeTenantId = tenantIdOverride || tenant?.id;
+
+    useEffect(() => {
+        if (!activeTenantId || !sessionId) return;
+
+        const wsUrl = `${API_BASE_URL}/ws`;
+        const subscriptions = [
+            {
+                destination: `/topic/tenant/${activeTenantId}/session/${sessionId}`,
+                callback: handleMessage
+            }
+        ];
+
+        clientRef.current = createStompClient(
+            wsUrl,
+            subscriptions,
+            () => console.log('[WS ByID] Session subscription active for session:', sessionId),
+            (err) => console.error('[WS ByID] Session error:', err)
+        );
+
+        return () => {
+            if (clientRef.current) {
+                clientRef.current.deactivate();
+            }
+        };
+    }, [activeTenantId, sessionId, handleMessage]);
+}
+
+/**
+ * Hook for table grid real-time updates
+ * Subscribe to all tables changes
+ */
+export function useTableWebSocket(onTableUpdate) {
+    const { tenant } = useTenant();
+    const clientRef = useRef(null);
+
+    useEffect(() => {
+        if (!tenant?.id) return;
+
+        const wsUrl = `${API_BASE_URL}/ws`;
+        const subscriptions = [
+            {
+                destination: `/topic/tenant/${tenant.id}/tables`,
+                callback: onTableUpdate
+            }
+        ];
+
+        clientRef.current = createStompClient(
+            wsUrl,
+            subscriptions,
+            () => console.log('[WS] Tables subscription active'),
+            (err) => console.error('[WS] Tables error:', err)
+        );
+
+        return () => {
+            if (clientRef.current) {
+                clientRef.current.deactivate();
+            }
+        };
+    }, [tenant?.id, onTableUpdate]);
+}
+
+/**
+ * Hook for pending sessions real-time updates (staff notifications)
+ */
+export function usePendingSessionsWebSocket(onPendingUpdate) {
+    const { tenant } = useTenant();
+    const clientRef = useRef(null);
+
+    useEffect(() => {
+        console.log('[WS Pending] Effect triggered - tenantId:', tenant?.id);
+        if (!tenant?.id) {
+            console.log('[WS Pending] No tenant, skipping');
+            return;
+        }
+
+        const wsUrl = `${API_BASE_URL}/ws`;
+        const topic = `/topic/tenant/${tenant.id}/pending-sessions`;
+        console.log('[WS Pending] Subscribing to:', topic);
+        
+        const subscriptions = [
+            {
+                destination: topic,
+                callback: (data) => {
+                    console.log('[WS Pending] ✅ Received update:', data);
+                    onPendingUpdate(data);
+                }
+            }
+        ];
+
+        clientRef.current = createStompClient(
+            wsUrl,
+            subscriptions,
+            () => console.log('[WS Pending] ✅ Subscription active for:', topic),
+            (err) => console.error('[WS Pending] ❌ Error:', err)
+        );
+
+        return () => {
+            if (clientRef.current) {
+                clientRef.current.deactivate();
+            }
+        };
+    }, [tenant?.id, onPendingUpdate]);
+}
+
+/**
+ * Hook for general notifications
+ */
+export function useNotificationWebSocket(onNotification) {
+    const { tenant } = useTenant();
+    const clientRef = useRef(null);
+
+    useEffect(() => {
+        if (!tenant?.id) return;
+
+        const wsUrl = `${API_BASE_URL}/ws`;
+        const subscriptions = [
+            {
+                destination: `/topic/tenant/${tenant.id}/notifications`,
+                callback: onNotification
+            }
+        ];
+
+        clientRef.current = createStompClient(
+            wsUrl,
+            subscriptions,
+            () => console.log('[WS] Notifications subscription active'),
+            (err) => console.error('[WS] Notifications error:', err)
+        );
+
+        return () => {
+            if (clientRef.current) {
+                clientRef.current.deactivate();
+            }
+        };
+    }, [tenant?.id, onNotification]);
+}
+
+/**
+ * Hook to subscribe multiple sessions at once (for pending sessions monitoring)
+ * This creates ONE client subscribing to MULTIPLE session topics
+ */
+export function useMultipleSessionsWebSocket(sessionIds, onSessionUpdate, onItemEvent) {
+    const { tenant } = useTenant();
+    const clientRef = useRef(null);
+    const sessionIdsRef = useRef([]);
+
+    const handleMessage = useCallback((data) => {
+        console.log('[WS Multi] Received:', data);
         if (data.type && ['ORDER_ITEM_ADDED', 'ORDER_ITEM_DELETED', 'ORDER_ITEM_SERVED', 'ORDER_ITEM_UPDATED'].includes(data.type)) {
             if (onItemEvent) {
                 onItemEvent(data);
@@ -195,127 +323,55 @@ export function useSessionByIdWebSocket(sessionId, onSessionUpdate, onItemEvent)
     }, [onSessionUpdate, onItemEvent]);
 
     useEffect(() => {
-        if (!currentTenant?.id || !sessionId) return;
-
-        const wsUrl = `${API_BASE_URL}/ws`;
-        const subscriptions = [
-            {
-                destination: `/topic/tenant/${currentTenant.id}/session/${sessionId}`,
-                callback: handleMessage
+        console.log('[WS Multi] Effect triggered - sessionIds:', sessionIds);
+        
+        if (!tenant?.id || !sessionIds || sessionIds.length === 0) {
+            console.log('[WS Multi] No tenant or empty sessions, cleaning up');
+            // Cleanup if no sessions
+            if (clientRef.current) {
+                clientRef.current.deactivate();
+                clientRef.current = null;
             }
-        ];
+            sessionIdsRef.current = [];
+            return;
+        }
 
-        connectionRef.current = createStompConnection(
+        // Check if sessionIds actually changed (deep comparison)
+        const idsChanged = JSON.stringify(sessionIdsRef.current.sort()) !== JSON.stringify([...sessionIds].sort());
+        console.log('[WS Multi] IDs changed?', idsChanged, 'Previous:', sessionIdsRef.current, 'New:', sessionIds);
+        
+        if (!idsChanged && clientRef.current) {
+            console.log('[WS Multi] No change and client exists, skipping');
+            return; // No change, keep existing connection
+        }
+
+        sessionIdsRef.current = sessionIds;
+
+        // Deactivate old client
+        if (clientRef.current) {
+            console.log('[WS Multi] Deactivating old client');
+            clientRef.current.deactivate();
+        }
+
+        console.log('[WS Multi] Creating new client for sessions:', sessionIds);
+        const wsUrl = `${API_BASE_URL}/ws`;
+        const subscriptions = sessionIds.map(sessionId => ({
+            destination: `/topic/tenant/${tenant.id}/session/${sessionId}`,
+            callback: handleMessage
+        }));
+
+        clientRef.current = createStompClient(
             wsUrl,
             subscriptions,
-            () => console.log('[WS] Session by ID subscription active'),
-            (err) => console.error('[WS] Session by ID error:', err)
+            () => console.log('[WS Multi] ✅ Subscribed to', sessionIds.length, 'sessions:', sessionIds),
+            (err) => console.error('[WS Multi] ❌ Error:', err)
         );
 
         return () => {
-            if (connectionRef.current) {
-                connectionRef.current.disconnect();
+            if (clientRef.current) {
+                console.log('[WS Multi] Cleanup - deactivating client');
+                clientRef.current.deactivate();
             }
         };
-    }, [currentTenant?.id, sessionId, handleMessage]);
-}
-
-/**
- * Hook for table grid real-time updates
- * Subscribe to all tables changes
- */
-export function useTableWebSocket(onTableUpdate) {
-    const { currentTenant } = useTenant();
-    const connectionRef = useRef(null);
-
-    useEffect(() => {
-        if (!currentTenant?.id) return;
-
-        const wsUrl = `${API_BASE_URL}/ws`;
-        const subscriptions = [
-            {
-                destination: `/topic/tenant/${currentTenant.id}/tables`,
-                callback: onTableUpdate
-            }
-        ];
-
-        connectionRef.current = createStompConnection(
-            wsUrl,
-            subscriptions,
-            () => console.log('[WS] Tables subscription active'),
-            (err) => console.error('[WS] Tables error:', err)
-        );
-
-        return () => {
-            if (connectionRef.current) {
-                connectionRef.current.disconnect();
-            }
-        };
-    }, [currentTenant?.id, onTableUpdate]);
-}
-
-/**
- * Hook for pending sessions real-time updates (staff notifications)
- */
-export function usePendingSessionsWebSocket(onPendingUpdate) {
-    const { currentTenant } = useTenant();
-    const connectionRef = useRef(null);
-
-    useEffect(() => {
-        if (!currentTenant?.id) return;
-
-        const wsUrl = `${API_BASE_URL}/ws`;
-        const subscriptions = [
-            {
-                destination: `/topic/tenant/${currentTenant.id}/pending-sessions`,
-                callback: onPendingUpdate
-            }
-        ];
-
-        connectionRef.current = createStompConnection(
-            wsUrl,
-            subscriptions,
-            () => console.log('[WS] Pending sessions subscription active'),
-            (err) => console.error('[WS] Pending sessions error:', err)
-        );
-
-        return () => {
-            if (connectionRef.current) {
-                connectionRef.current.disconnect();
-            }
-        };
-    }, [currentTenant?.id, onPendingUpdate]);
-}
-
-/**
- * Hook for general notifications
- */
-export function useNotificationWebSocket(onNotification) {
-    const { currentTenant } = useTenant();
-    const connectionRef = useRef(null);
-
-    useEffect(() => {
-        if (!currentTenant?.id) return;
-
-        const wsUrl = `${API_BASE_URL}/ws`;
-        const subscriptions = [
-            {
-                destination: `/topic/tenant/${currentTenant.id}/notifications`,
-                callback: onNotification
-            }
-        ];
-
-        connectionRef.current = createStompConnection(
-            wsUrl,
-            subscriptions,
-            () => console.log('[WS] Notifications subscription active'),
-            (err) => console.error('[WS] Notifications error:', err)
-        );
-
-        return () => {
-            if (connectionRef.current) {
-                connectionRef.current.disconnect();
-            }
-        };
-    }, [currentTenant?.id, onNotification]);
+    }, [tenant?.id, JSON.stringify([...sessionIds].sort()), handleMessage]);
 }

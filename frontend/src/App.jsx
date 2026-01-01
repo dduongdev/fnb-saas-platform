@@ -104,6 +104,7 @@ function AppRoutes() {
       {/* Public Routes */}
       <Route path="/shops" element={<PublicTenantListPage />} />
       <Route path="/table/:tableId" element={<CustomerMenuPage />} />
+      <Route path="/menu/:tenantId/:tableId" element={<CustomerMenuPage />} />
 
       {/* Auth Routes */}
       <Route

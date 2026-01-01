@@ -197,3 +197,13 @@ export const getCustomerOrderStatus = (sessionId) =>
  */
 export const addCustomerItems = (sessionId, { tableId, items }) =>
     api.post(`/api/pos/public/sessions/${sessionId}/items`, { tableId, items });
+
+/**
+ * Khách xóa món khỏi session (chỉ PENDING items)
+ * Cho phép khách tự xóa món đã gọi khi còn trạng thái PENDING.
+ * @param {number} sessionId
+ * @param {number} itemId - ID của order item cần xóa
+ * @returns {Promise<string>}
+ */
+export const removeCustomerItem = (sessionId, itemId) =>
+    api.delete(`/api/pos/public/sessions/${sessionId}/items/${itemId}`);

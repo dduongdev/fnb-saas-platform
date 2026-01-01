@@ -19,7 +19,7 @@ import {
     confirmSession,
     rejectSession
 } from '../../api/session';
-import { useSessionWebSocket, usePendingSessionsWebSocket } from '../../hooks/useWebSocket';
+import { useSessionWebSocket, useSessionByIdWebSocket, usePendingSessionsWebSocket, useMultipleSessionsWebSocket } from '../../hooks/useWebSocket';
 import './POSPage.css';
 
 export function POSPage() {
@@ -99,13 +99,37 @@ export function POSPage() {
     }, []);
 
     const handlePendingUpdate = useCallback((data) => {
-        console.log('[WS] Pending sessions updated:', data);
+        console.log('[WS POS] Pending sessions updated:', data);
+        console.log('[WS POS] Previous count:', pendingSessions.length, 'New count:', data?.length || 0);
+        
+        // Log chi tiết từng session
+        if (data && data.length > 0) {
+            data.forEach((sess, idx) => {
+                const totalItems = sess.orders?.reduce((sum, ord) => sum + (ord.items?.length || 0), 0) || 0;
+                console.log(`[WS POS] Session #${idx + 1}:`, {
+                    id: sess.sessionId || sess.id,
+                    tableNames: sess.tableNames,
+                    status: sess.status,
+                    totalItems,
+                    total: sess.total
+                });
+            });
+        }
+        
         setPendingSessions(data || []);
-    }, []);
+    }, [pendingSessions.length]);
 
     // Subscribe to WebSocket for real-time updates (with event handler)
+    // Subscribe by tableId for table-based sessions
     useSessionWebSocket(selectedTableId, handleSessionUpdate, handleItemEvent);
+    // Subscribe by sessionId for current viewing session
+    useSessionByIdWebSocket(session?.id, handleSessionUpdate, handleItemEvent);
+    // Subscribe to pending sessions list updates
     usePendingSessionsWebSocket(handlePendingUpdate);
+    // Subscribe to ALL pending sessions for realtime item events
+    const pendingSessionIds = pendingSessions.map(ps => ps.sessionId || ps.id).filter(Boolean);
+    console.log('[POS] Pending session IDs for WS subscription:', pendingSessionIds, 'from', pendingSessions.length, 'sessions');
+    useMultipleSessionsWebSocket(pendingSessionIds, handleSessionUpdate, handleItemEvent);
 
     // Fallback polling for pending sessions (in case WebSocket fails)
     useEffect(() => {
@@ -121,7 +145,9 @@ export function POSPage() {
 
     const loadPendingSessions = async () => {
         try {
+            console.log('[POS] Loading pending sessions...');
             const data = await getPendingSessions();
+            console.log('[POS] Loaded pending sessions:', data?.length || 0, 'sessions', data);
             const prev = pendingSessions.length;
             setPendingSessions(data || []);
             // Show toast if new pending order arrives
@@ -129,7 +155,7 @@ export function POSPage() {
                 toast.info('Có đơn hàng mới chờ xác nhận!');
             }
         } catch (error) {
-            console.error('Failed to load pending sessions:', error);
+            console.error('[POS] Failed to load pending sessions:', error);
         }
     };
 

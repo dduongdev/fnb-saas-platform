@@ -1,14 +1,17 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { ShoppingCart, Minus, Plus, X, Utensils, Clock, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { ShoppingCart, Minus, Plus, X, Utensils, Clock, CheckCircle, XCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { Loading, Button, Card, Empty, Input } from '../../components/common';
 import { getPublicMenu, getTableInfo } from '../../api/pos';
-import { createCustomerOrder, getCustomerOrderStatus, addCustomerItems } from '../../api/session';
+import { createCustomerOrder, getCustomerOrderStatus, addCustomerItems, removeCustomerItem } from '../../api/session';
+import { useSessionByIdWebSocket } from '../../hooks/useWebSocket';
 import { formatPrice } from '../../utils/format';
 import './CustomerMenuPage.css';
 
+console.log('[CustomerMenuPage] Component loaded, CSS should be imported');
+
 export function CustomerMenuPage() {
-    const { tableId } = useParams();
+    const { tableId, tenantId } = useParams();
     const [tableInfo, setTableInfo] = useState(null);
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -17,58 +20,128 @@ export function CustomerMenuPage() {
     const [showCart, setShowCart] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
-    // Order status tracking
-    const [currentOrder, setCurrentOrder] = useState(null); // { sessionId, status, ... }
+    // Order status tracking - using same structure as backend SessionResponse
+    const [session, setSession] = useState(null); // Full session state from backend
     const [orderView, setOrderView] = useState('menu'); // 'menu' | 'pending' | 'confirmed' | 'rejected'
-    const pollingRef = useRef(null);
+    const [actionLoading, setActionLoading] = useState(null); // itemId being processed
+
+    // WebSocket: Handle real-time updates - UPDATE STATE DIRECTLY from events
+    const handleSessionUpdate = useCallback((data) => {
+        console.log('[WS Client] Session full update:', data);
+        setSession(data);
+
+        // Update view based on status
+        if (data.status === 'ACTIVE') {
+            setOrderView('confirmed');
+        } else if (data.status === 'CANCELLED') {
+            setOrderView('rejected');
+        } else if (data.status === 'PENDING') {
+            setOrderView('pending');
+        }
+    }, []);
+
+    const handleItemEvent = useCallback((event) => {
+        console.log('[WS Client] Item event:', event);
+
+        // Update state directly from event like OrderSessionPage
+        setSession(prev => {
+            if (!prev) return prev;
+            const order = prev.orders?.[0];
+            if (!order) return prev;
+
+            let newItems = [...(order.items || [])];
+
+            switch (event.type) {
+                case 'ORDER_ITEM_ADDED':
+                    // Add new item to list
+                    newItems = [...newItems, {
+                        id: event.item.id,
+                        productId: event.item.productId,
+                        productName: event.item.productName,
+                        productImage: event.item.productImage,
+                        quantity: event.item.quantity,
+                        price: event.item.price,
+                        note: event.item.note,
+                        status: event.item.status,
+                        total: event.item.total
+                    }];
+                    break;
+
+                case 'ORDER_ITEM_DELETED':
+                    // Remove item from list
+                    newItems = newItems.filter(i => i.id !== event.item.id);
+                    break;
+
+                case 'ORDER_ITEM_SERVED':
+                case 'ORDER_ITEM_UPDATED':
+                    // Update item in list
+                    newItems = newItems.map(i =>
+                        i.id === event.item.id
+                            ? { ...i, ...event.item }
+                            : i
+                    );
+                    break;
+            }
+
+            return {
+                ...prev,
+                totalAmount: event.newTotalAmount,
+                orders: [{
+                    ...order,
+                    items: newItems
+                }]
+            };
+        });
+    }, []);
+
+    useSessionByIdWebSocket(
+        session?.sessionId,
+        handleSessionUpdate, // onSessionUpdate
+        handleItemEvent, // onItemEvent
+        tenantId // tenantId override for public access
+    );
+
+    const fetchCurrentOrder = async (sessionId) => {
+        try {
+            console.log('[Customer] Fetching session:', sessionId);
+            const data = await getCustomerOrderStatus(sessionId);
+            console.log('[Customer] Session data received:', data);
+            setSession(data);
+
+            if (data.status === 'ACTIVE') {
+                console.log('[Customer] Session is ACTIVE, showing confirmed view');
+                setOrderView('confirmed');
+            } else if (data.status === 'CANCELLED') {
+                console.log('[Customer] Session is CANCELLED, showing rejected view');
+                setOrderView('rejected');
+            } else if (data.status === 'PENDING') {
+                console.log('[Customer] Session is PENDING, showing pending view');
+                setOrderView('pending');
+            }
+        } catch (error) {
+            console.error('[Customer] Failed to fetch session:', error);
+        }
+    };
 
     useEffect(() => {
+        // Ưu tiên lấy tenantId từ URL nếu có
+        if (tenantId) {
+            localStorage.setItem('tenant_id', tenantId);
+        }
+
         if (tableId) {
             loadData();
         }
 
-        // Cleanup polling on unmount
-        return () => {
-            if (pollingRef.current) {
-                clearInterval(pollingRef.current);
+        // Reload table info khi user quay lại trang (để check session existing)
+        const handleFocus = () => {
+            if (tableId) {
+                reloadTableInfo();
             }
         };
-    }, [tableId]);
-
-    // Poll for order status when pending
-    useEffect(() => {
-        if (currentOrder?.sessionId && currentOrder.status === 'PENDING') {
-            startPollingStatus(currentOrder.sessionId);
-        }
-        return () => {
-            if (pollingRef.current) {
-                clearInterval(pollingRef.current);
-            }
-        };
-    }, [currentOrder?.sessionId, currentOrder?.status]);
-
-    const startPollingStatus = (sessionId) => {
-        if (pollingRef.current) {
-            clearInterval(pollingRef.current);
-        }
-
-        pollingRef.current = setInterval(async () => {
-            try {
-                const status = await getCustomerOrderStatus(sessionId);
-                setCurrentOrder(status);
-
-                if (status.status === 'ACTIVE') {
-                    setOrderView('confirmed');
-                    clearInterval(pollingRef.current);
-                } else if (status.status === 'CANCELLED') {
-                    setOrderView('rejected');
-                    clearInterval(pollingRef.current);
-                }
-            } catch (error) {
-                console.error('Failed to check status:', error);
-            }
-        }, 3000); // Poll every 3 seconds
-    };
+        window.addEventListener('focus', handleFocus);
+        return () => window.removeEventListener('focus', handleFocus);
+    }, [tableId, tenantId]);
 
     const loadData = async () => {
         try {
@@ -76,23 +149,49 @@ export function CustomerMenuPage() {
             // 1. Get table info (includes tenantId needed for subsequent requests)
             const info = await getTableInfo(tableId);
             setTableInfo(info);
+            console.log('[Customer] Table info loaded:', info);
 
-            // IMPORTANT: Set tenant_id for API client to use in subsequent requests
-            if (info.tenantId) {
+            // Set tenant_id from API info if URL param missing
+            if (info.tenantId && !tenantId) {
                 localStorage.setItem('tenant_id', info.tenantId);
             }
 
-            // 2. Get public menu
+            // 2. Check if table has existing session → load it immediately
+            if (info.sessionId) {
+                console.log('[Customer] Table has existing session:', info.sessionId);
+                await fetchCurrentOrder(info.sessionId);
+            } else {
+                console.log('[Customer] No existing session for this table');
+            }
+
+            // 3. Get public menu
             const menuData = await getPublicMenu();
+            console.log('[Customer] Menu data loaded:', menuData);
             setCategories(menuData || []);
             if (menuData?.length > 0) {
                 setActiveCategory(menuData[0].categoryId);
             }
         } catch (error) {
-            console.error('Failed to load menu:', error);
-            alert('Không thể tải menu: ' + error.message);
+            console.error('[Customer] Failed to load data:', error);
+            // Không hiện alert cho error menu vì có thể là lỗi network tạm thời
+            // Menu vẫn load được sau khi retry
         } finally {
             setLoading(false);
+        }
+    };
+
+    const reloadTableInfo = async () => {
+        try {
+            const info = await getTableInfo(tableId);
+            setTableInfo(info);
+            console.log('[Customer] Table info reloaded:', info);
+
+            // Nếu table có session, load session đó
+            if (info.sessionId) {
+                await fetchCurrentOrder(info.sessionId);
+            }
+        } catch (error) {
+            console.error('Failed to reload table info:', error);
         }
     };
 
@@ -141,6 +240,9 @@ export function CustomerMenuPage() {
                 quantity: item.quantity
             }));
 
+            // Reload table info để check session mới nhất
+            await reloadTableInfo();
+
             // Check if table already has active session
             if (tableInfo?.hasActiveSession && tableInfo?.sessionId) {
                 // Add to existing session
@@ -148,22 +250,30 @@ export function CustomerMenuPage() {
                     tableId: parseInt(tableId),
                     items
                 });
-                setCurrentOrder(result);
-                setOrderView('confirmed');
+                setSession(result);
+                setOrderView(result.status === 'ACTIVE' ? 'confirmed' : 'pending');
             } else {
                 // Create new pending session
                 const result = await createCustomerOrder({
                     tableId: parseInt(tableId),
                     items
                 });
-                setCurrentOrder(result);
+                setSession(result);
                 setOrderView('pending');
             }
 
             setCart([]);
             setShowCart(false);
         } catch (error) {
-            alert('Đặt món thất bại: ' + error.message);
+            console.error('[Customer] Submit order error:', error);
+
+            // Nếu lỗi do session đã tồn tại, reload để lấy session hiện tại
+            if (error.message?.includes('đang có order chờ') || error.message?.includes('PENDING')) {
+                alert('Bàn này đang có đơn hàng chờ xác nhận. Đang tải đơn hàng...');
+                await reloadTableInfo();
+            } else {
+                alert('Đặt món thất bại: ' + error.message);
+            }
         } finally {
             setSubmitting(false);
         }
@@ -174,10 +284,60 @@ export function CustomerMenuPage() {
     };
 
     const handleNewOrder = () => {
-        setCurrentOrder(null);
+        setSession(null);
         setOrderView('menu');
         loadData(); // Refresh table info
     };
+
+    // Remove item from session (only PENDING items)
+    const handleRemoveItem = async (item) => {
+        if (item.status !== 'PENDING') {
+            alert('Không thể xóa món đã mang ra');
+            return;
+        }
+
+        if (!confirm(`Xóa "${item.productName}"?`)) {
+            return;
+        }
+
+        try {
+            setActionLoading(item.id);
+            await removeCustomerItem(session.sessionId, item.id);
+            // State will be updated via WebSocket event
+        } catch (error) {
+            if (error.status === 409) {
+                alert('Món đã được mang ra, không thể xóa');
+                await fetchCurrentOrder(session.sessionId); // Reload to sync
+            } else {
+                alert(error.message);
+            }
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    // Derived data
+    let orderItems = [];
+    if (session?.items) {
+        orderItems = session.items; // REST API: CustomerOrderResponse
+    } else if (session?.orders?.[0]?.items) {
+        orderItems = session.orders[0].items; // WebSocket: SessionResponse
+    }
+    const pendingItems = orderItems.filter(i => i.status === 'PENDING');
+    const servedItems = orderItems.filter(i => i.status === 'SERVED');
+    const sessionTotal = session?.totalAmount || 0;
+
+    // Debug logs
+    if (session && orderView === 'confirmed') {
+        console.log('[Customer] Session data:', {
+            sessionId: session.sessionId || session.id,
+            status: session.status,
+            ordersCount: session.orders?.length,
+            firstOrder: session.orders?.[0],
+            itemsCount: orderItems.length,
+            items: orderItems
+        });
+    }
 
     if (loading) {
         return (
@@ -188,107 +348,59 @@ export function CustomerMenuPage() {
         );
     }
 
-    // Pending view - waiting for staff confirmation
-    if (orderView === 'pending') {
-        return (
-            <div className="order-status-page">
-                <div className="status-card pending">
-                    <div className="status-icon">
-                        <Clock size={64} className="pulse" />
-                    </div>
-                    <h2>Đang chờ xác nhận</h2>
-                    <p>{currentOrder?.statusMessage || 'Order của bạn đã được gửi đến nhân viên.'}</p>
-                    <p className="sub-text">Vui lòng đợi trong giây lát...</p>
-
-                    {currentOrder && (
-                        <div className="order-summary">
-                            <h4>Chi tiết order</h4>
-                            <p className="table-info">🪑 {currentOrder.tableName}</p>
-                            <ul className="item-list">
-                                {currentOrder.items?.map((item, idx) => (
-                                    <li key={idx}>
-                                        {item.productName} x{item.quantity} - {formatPrice(item.total)}
-                                    </li>
-                                ))}
-                            </ul>
-                            <p className="total">Tổng: {formatPrice(currentOrder.totalAmount)}</p>
-                        </div>
-                    )}
-
-                    <div className="status-indicator">
-                        <RefreshCw size={16} className="spin" />
-                        <span>Đang kiểm tra trạng thái...</span>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    // Confirmed view - order accepted
-    if (orderView === 'confirmed') {
-        return (
-            <div className="order-status-page">
-                <div className="status-card confirmed">
-                    <div className="status-icon success">
-                        <CheckCircle size={64} />
-                    </div>
-                    <h2>Order đã được xác nhận!</h2>
-                    <p>Món ăn của bạn đang được chuẩn bị.</p>
-
-                    {currentOrder && (
-                        <div className="order-summary">
-                            <h4>Chi tiết order</h4>
-                            <p className="table-info">🪑 {currentOrder.tableName}</p>
-                            <ul className="item-list">
-                                {currentOrder.items?.map((item, idx) => (
-                                    <li key={idx}>
-                                        {item.productName} x{item.quantity} - {formatPrice(item.total)}
-                                    </li>
-                                ))}
-                            </ul>
-                            <p className="total">Tổng: {formatPrice(currentOrder.totalAmount)}</p>
-                        </div>
-                    )}
-
-                    <Button onClick={handleAddMoreItems} className="add-more-btn">
-                        <Plus size={16} /> Gọi thêm món
-                    </Button>
-                </div>
-            </div>
-        );
-    }
-
-    // Rejected view - order rejected
-    if (orderView === 'rejected') {
-        return (
-            <div className="order-status-page">
-                <div className="status-card rejected">
-                    <div className="status-icon error">
-                        <XCircle size={64} />
-                    </div>
-                    <h2>Order bị từ chối</h2>
-                    {currentOrder?.rejectReason && (
-                        <p className="reject-reason">Lý do: {currentOrder.rejectReason}</p>
-                    )}
-                    <p>Vui lòng liên hệ nhân viên hoặc thử lại.</p>
-
-                    <Button onClick={handleNewOrder} className="retry-btn">
-                        Thử lại
-                    </Button>
-                </div>
-            </div>
-        );
-    }
-
+    // Main layout: Always show menu + order status together
     return (
         <div className="customer-page">
             {/* Header */}
             <header className="customer-header">
                 <div className="shop-info">
                     <h1>{tableInfo?.tenantName || 'Menu quán'}</h1>
-                    <p>{tableInfo?.tableName || 'Bàn'}</p>
+                    <p>🪑 {tableInfo?.tableName || `Bàn ${tableId}`}</p>
                 </div>
             </header>
+
+            {/* Order Status Banner (if exists) */}
+            {/* Order Status Banner (if exists) */}
+            {session && (
+                <div
+                    className={`order-status-banner ${session.status?.toLowerCase()}`}
+                    onClick={() => setShowCart(true)} // Click to open drawer
+                >
+                    <div className="status-header">
+                        {session.status === 'PENDING' && (
+                            <div className="status-content">
+                                <Clock size={20} className="pulse" />
+                                <span>Đơn hàng đang chờ xác nhận...</span>
+                            </div>
+                        )}
+                        {session.status === 'ACTIVE' && (
+                            <div className="status-content">
+                                <CheckCircle size={20} />
+                                <span>Đơn hàng đã được xác nhận</span>
+                            </div>
+                        )}
+                        {session.status === 'CANCELLED' && (
+                            <div className="status-content">
+                                <XCircle size={20} />
+                                <span>Đơn hàng bị từ chối</span>
+                            </div>
+                        )}
+                        <span className="view-details-link">Xem chi tiết &gt;</span>
+                    </div>
+
+                    {/* Mini Summary Text */}
+                    {orderItems.length > 0 && (
+                        <div className="status-summary">
+                            <span>{orderItems.length} món</span>
+                            <span>•</span>
+                            <span>{formatPrice(sessionTotal)}</span>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Current Order Summary (if exists) */}
+
 
             {/* Categories Nav */}
             <nav className="category-nav">
@@ -328,61 +440,143 @@ export function CustomerMenuPage() {
                 ))}
             </main>
 
-            {/* Cart Float Button */}
-            {cart.length > 0 && (
-                <button className="cart-float-btn" onClick={() => setShowCart(true)}>
+            {/* Floating Action Button: Cart or Bill */}
+            {(cart.length > 0 || (session && orderItems.length > 0)) && (
+                <button
+                    className={`cart-float-btn ${cart.length === 0 ? 'bill-mode' : ''}`}
+                    onClick={() => setShowCart(true)}
+                >
                     <div className="cart-icon">
-                        <ShoppingCart size={24} />
-                        <span className="badge">{totalItems}</span>
+                        {cart.length > 0 ? <ShoppingCart size={24} /> : <Utensils size={24} />}
+                        <span className="badge">
+                            {cart.length > 0 ? calculateTotalItems(cart) : orderItems.length}
+                        </span>
                     </div>
-                    <span className="total">{formatPrice(totalAmount)}</span>
+                    <span className="label">
+                        {cart.length > 0 ? 'Xem giỏ hàng' : 'Xem đơn / Thanh toán'}
+                    </span>
+                    <span className="total">{formatPrice(sessionTotal + totalAmount)}</span>
                 </button>
             )}
 
-            {/* Cart Modal */}
+            {/* Cart Modal / Order Panel */}
             {showCart && (
                 <div className="cart-overlay">
                     <div className="cart-modal">
                         <div className="cart-header">
-                            <h3>Giỏ hàng của bạn</h3>
+                            <h3>🛒 Đơn hàng của bạn</h3>
                             <button className="close-btn" onClick={() => setShowCart(false)}>
                                 <X size={24} />
                             </button>
                         </div>
 
                         <div className="cart-items">
-                            {cart.map(item => (
-                                <div key={item.productId} className="cart-item">
-                                    <div className="item-info">
-                                        <h4>{item.productName}</h4>
-                                        <span className="item-price">{formatPrice(item.price)}</span>
-                                    </div>
-                                    <div className="qty-control">
-                                        <button onClick={() => updateQuantity(item.productId, -1)}>
-                                            <Minus size={16} />
-                                        </button>
-                                        <span>{item.quantity}</span>
-                                        <button onClick={() => updateQuantity(item.productId, 1)}>
-                                            <Plus size={16} />
-                                        </button>
-                                    </div>
+                            {/* 1. New Items in Cart (Chưa gửi) */}
+                            {cart.length > 0 && (
+                                <div className="cart-section">
+                                    <h4 className="cart-section-title text-primary">Món mới (Chưa gửi)</h4>
+                                    {cart.map(item => (
+                                        <div key={item.productId} className="cart-item">
+                                            <div className="item-info">
+                                                <h4>{item.productName}</h4>
+                                                <span className="item-price">{formatPrice(item.price)}</span>
+                                            </div>
+                                            <div className="qty-control">
+                                                <button onClick={() => updateQuantity(item.productId, -1)}>
+                                                    <Minus size={16} />
+                                                </button>
+                                                <span>{item.quantity}</span>
+                                                <button onClick={() => updateQuantity(item.productId, 1)}>
+                                                    <Plus size={16} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <div className="cart-section-divider"></div>
                                 </div>
-                            ))}
+                            )}
+
+                            {/* 2. Pending Items (Đang chờ xác nhận) */}
+                            {pendingItems.length > 0 && (
+                                <div className="cart-section">
+                                    <h4 className="cart-section-title text-warning">Đang chờ xác nhận</h4>
+                                    {pendingItems.map(item => (
+                                        <div key={item.id} className="cart-item">
+                                            <div className="item-info">
+                                                <h4>{item.productName}</h4>
+                                                <span className="item-price">{formatPrice(item.total)}</span>
+                                                <span className="item-qty-badge">x{item.quantity}</span>
+                                            </div>
+                                            <button
+                                                className="btn-remove-item"
+                                                onClick={() => handleRemoveItem(item)}
+                                                disabled={actionLoading === item.id}
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <div className="cart-section-divider"></div>
+                                </div>
+                            )}
+
+                            {/* 3. Served/Confirmed Items (Đã đặt) */}
+                            {servedItems.length > 0 && (
+                                <div className="cart-section">
+                                    <h4 className="cart-section-title text-success">Đã xác nhận / Đã ra</h4>
+                                    {servedItems.map(item => (
+                                        <div key={item.id} className="cart-item">
+                                            <div className="item-info">
+                                                <h4>{item.productName}</h4>
+                                                <span className="item-price">{formatPrice(item.total)}</span>
+                                            </div>
+                                            <span className="item-qty-display">x{item.quantity}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {cart.length === 0 && pendingItems.length === 0 && servedItems.length === 0 && (
+                                <div className="empty-cart-msg">
+                                    <Utensils size={48} className="text-muted" />
+                                    <p>Bạn chưa gọi món nào</p>
+                                </div>
+                            )}
                         </div>
 
                         <div className="cart-footer">
                             <div className="cart-total">
                                 <span>Tổng cộng:</span>
-                                <span className="amount">{formatPrice(totalAmount)}</span>
+                                <span className="amount">{formatPrice(sessionTotal + totalAmount)}</span>
                             </div>
-                            <Button
-                                className="checkout-btn"
-                                onClick={handleSubmitOrder}
-                                loading={submitting}
-                                disabled={cart.length === 0}
-                            >
-                                Gửi gọi món
-                            </Button>
+
+                            {cart.length > 0 ? (
+                                <Button
+                                    className="checkout-btn"
+                                    onClick={handleSubmitOrder}
+                                    loading={submitting}
+                                >
+                                    Gửi gọi món ({cart.length})
+                                </Button>
+                            ) : (
+                                <div className="bill-actions">
+                                    {session?.status === 'ACTIVE' && (
+                                        <Button
+                                            className="btn-payment"
+                                            onClick={() => alert('Đã gửi yêu cầu thanh toán đến thu ngân!')}
+                                        >
+                                            Thanh toán / Gọi Bill
+                                        </Button>
+                                    )}
+                                    <Button
+                                        className="close-drawer-btn"
+                                        onClick={() => setShowCart(false)}
+                                        variant="secondary"
+                                    >
+                                        Đóng
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
