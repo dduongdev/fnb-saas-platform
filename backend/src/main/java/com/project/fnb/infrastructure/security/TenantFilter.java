@@ -18,43 +18,42 @@ public class TenantFilter implements Filter {
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
-        
+
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse res = (HttpServletResponse) response;
 
-        // 1. Lấy URI của request
         String path = req.getRequestURI();
-
-        // 2. Định nghĩa các URL không cần Tenant Context
-        if (path.startsWith("/api/public/") || 
-            path.startsWith("/api/auth/") ||
-            path.startsWith("/api/recruitment/") || 
-            path.startsWith("/api/profile/") || 
-            path.startsWith("/api/tenants")
-        ) {
-            
-            chain.doFilter(request, response);
-            return; // Cho qua và không xử lý Tenant nữa
-        }
-        
-        // --- LOGIC BẮT BUỘC ---
-        // 3. Nếu là API nghiệp vụ, phải có Header
         String tenantId = req.getHeader(TENANT_HEADER);
 
-        if (tenantId == null || tenantId.isBlank()) {
-            // Ném lỗi ngay lập tức
-            res.setStatus(HttpServletResponse.SC_FORBIDDEN); // 403 Forbidden
-            res.setContentType("application/json");
-            res.getWriter().write("{\"code\": 403, \"message\": \"Access Denied: Missing X-Tenant-ID header\"}");
-            return; // Chặn request
+        // Logic check whitelist
+        boolean isWhitelisted = path.startsWith("/api/public/") ||
+                path.startsWith("/api/auth/") ||
+                path.startsWith("/api/recruitment/") ||
+                path.startsWith("/api/profile/") ||
+                path.startsWith("/api/tenants") ||
+                path.startsWith("/api/pos/public/") || // Added this
+                path.startsWith("/ws"); // WebSocket endpoint
+
+        // 1. Nếu có tenantId hợp lệ -> luôn set context
+        if (tenantId != null && !tenantId.isBlank()) {
+            TenantContext.setTenantId(tenantId);
+            try {
+                chain.doFilter(request, response);
+            } finally {
+                TenantContext.clear();
+            }
+            return;
         }
 
-        // 4. Nếu hợp lệ, set Context và tiếp tục
-        TenantContext.setTenantId(tenantId);
-        try {
+        // 2. Không có tenantId -> Check whitelist
+        if (isWhitelisted) {
             chain.doFilter(request, response);
-        } finally {
-            TenantContext.clear();
+            return;
         }
+
+        // 3. Không có tenantId và không phải whitelist -> Lỗi
+        res.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        res.setContentType("application/json");
+        res.getWriter().write("{\"code\": 403, \"message\": \"Access Denied: Missing X-Tenant-ID header\"}");
     }
 }

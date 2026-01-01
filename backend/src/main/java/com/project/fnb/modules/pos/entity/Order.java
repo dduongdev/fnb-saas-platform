@@ -10,8 +10,8 @@ import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "orders")
@@ -29,10 +29,10 @@ public class Order extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Bàn đang giữ order này (Luôn là bàn Master nếu gộp)
+    // Order thuộc về Session, KHÔNG thuộc trực tiếp Table
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "table_id", nullable = false)
-    private DiningTable table;
+    @JoinColumn(name = "session_id")
+    private ServingSession session;
 
     @Column(name = "total_amount")
     @Builder.Default
@@ -55,12 +55,19 @@ public class Order extends BaseEntity {
 
     @Builder.Default
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
-    private List<OrderItem> items = new ArrayList<>();
+    private Set<OrderItem> items = new HashSet<>();
 
     public enum OrderStatus {
-        OPEN,             // Đang phục vụ
-        WAITING_PAYMENT,  // Chờ thanh toán
-        COMPLETED,        // Đã thanh toán xong
-        CANCELLED         // Hủy
+        OPEN, // Đang phục vụ
+        WAITING_PAYMENT, // Chờ thanh toán
+        COMPLETED, // Đã thanh toán xong
+        CANCELLED // Hủy
+    }
+
+    /**
+     * Lấy bàn chính của order (từ session).
+     */
+    public DiningTable getPrimaryTable() {
+        return session != null ? session.getPrimaryTable() : null;
     }
 }

@@ -1,0 +1,45 @@
+.category-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.category-table th,
+.category-table td {
+    padding: var(--space-3) var(--space-4);
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.category-table th {
+    background-color: var(--bg-main);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    color: var(--text-secondary);
+}
+
+.category-table tbody tr:hover {
+    background-color: var(--bg-main);
+}
+
+.category-name {
+    font-weight: var(--font-medium);
+}
+
+.action-btn {
+    background: none;
+    border: none;
+    padding: var(--space-2);
+    color: var(--text-muted);
+    border-radius: var(--radius);
+    transition: all 0.15s ease;
+}
+
+.action-btn:hover {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+}
+
+.action-btn-danger:hover {
+    background-color: var(--danger-light);
+    color: var(--danger);
+}

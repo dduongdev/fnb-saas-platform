@@ -64,10 +64,49 @@ public class PaymentController {
     ) {
         // request.getPaymentMethodCode() sẽ là "VNPAY" hoặc "MOMO"
         String url = paymentService.createPaymentUrl(
-                request.getOrderId(), 
-                request.getPaymentMethodCode(), 
+                request.getOrderId(),
+                request.getPaymentMethodCode(),
                 "127.0.0.1" // IP Address
         );
         return ApiResponse.success(url);
+    }
+
+    @GetMapping("/vnpay/callback")
+    public void vnpayCallback(
+            @org.springframework.web.bind.annotation.RequestParam java.util.Map<String, String> requestParams,
+            jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        try {
+            paymentService.processPaymentCallback(requestParams);
+            // Redirect về trang menu của khách (Cần dynamic URL theo tenant nếu có domain
+            // riêng)
+            // Tạm thời hardcode localhost hoặc lấy từ env
+            // Frontend URL: /customer/menu/points?status=success (Ví dụ)
+            // Chúng ta không biết session ID ở đây nếu không lấy từ txnRef.
+            // txnRef format: orderId_timestamp.
+            // Để tiện, redirect về trang chủ bàn?
+            // Client đã lưu session trong localStorage, nên redirect về route
+            // /customer/menu là tự load lại.
+            String frontendUrl = "http://localhost:5173/customer/menu";
+            response.sendRedirect(frontendUrl + "?paymentStatus=success");
+        } catch (Exception e) {
+            String frontendUrl = "http://localhost:5173/customer/menu";
+            response.sendRedirect(frontendUrl + "?paymentStatus=failed&message="
+                    + java.net.URLEncoder.encode(e.getMessage(), java.nio.charset.StandardCharsets.UTF_8));
+        }
+    }
+
+    @GetMapping("/vnpay/ipn")
+    public java.util.Map<String, String> vnpayIpn(
+            @org.springframework.web.bind.annotation.RequestParam java.util.Map<String, String> requestParams) {
+        java.util.Map<String, String> result = new java.util.HashMap<>();
+        try {
+            paymentService.processPaymentCallback(requestParams);
+            result.put("RspCode", "00");
+            result.put("Message", "Confirm Success");
+        } catch (Exception e) {
+            result.put("RspCode", "99");
+            result.put("Message", "Unknown error"); // Or e.getMessage() but careful with length
+        }
+        return result;
     }
 }

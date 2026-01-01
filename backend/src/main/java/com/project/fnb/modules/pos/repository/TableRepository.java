@@ -12,10 +12,6 @@ import java.util.Optional;
 
 public interface TableRepository extends JpaRepository<DiningTable, Integer> {
     
-    // Tìm bàn con (Slave) của một bàn Master
-    List<DiningTable> findByMasterTableId(Integer masterId);
-
-    // Lấy toàn bộ bàn (Filter tự động chạy)
     List<DiningTable> findAll(Sort sort);
 
     @Override

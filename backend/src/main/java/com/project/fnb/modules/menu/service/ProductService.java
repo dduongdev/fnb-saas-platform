@@ -10,6 +10,8 @@ import com.project.fnb.modules.menu.repository.CategoryRepository;
 import com.project.fnb.modules.menu.repository.ProductImageRepository;
 import com.project.fnb.modules.menu.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -60,6 +62,35 @@ public class ProductService {
     private final ProductImageRepository productImageRepository;
     private final CategoryRepository categoryRepository;
     private final StorageService storageService;
+
+    /**
+     * Lấy danh sách sản phẩm theo tenant hiện tại.
+     * 
+     * <p>Phương thức này truy vấn danh sách sản phẩm theo tenant từ TenantContext.
+     * Hỗ trợ filter theo categoryId và status. Kết quả được phân trang.</p>
+     * 
+     * @param categoryId Filter theo danh mục (optional, null = tất cả)
+     * @param status Filter theo trạng thái (optional, null = tất cả)
+     * @param pageable Thông tin phân trang
+     * 
+     * @return Page<ProductResponse> danh sách sản phẩm đã filter và phân trang
+     */
+    @Transactional(readOnly = true)
+    public Page<ProductResponse> getProducts(Integer categoryId, Product.ProductStatus status, Pageable pageable) {
+        Page<Product> products;
+        
+        if (categoryId != null && status != null) {
+            products = productRepository.findByCategoryIdAndStatus(categoryId, status, pageable);
+        } else if (categoryId != null) {
+            products = productRepository.findByCategoryId(categoryId, pageable);
+        } else if (status != null) {
+            products = productRepository.findByStatus(status, pageable);
+        } else {
+            products = productRepository.findAll(pageable);
+        }
+        
+        return products.map(this::mapToResponse);
+    }
 
     /**
      * Tạo sản phẩm mới với hình ảnh trong danh mục được chỉ định.

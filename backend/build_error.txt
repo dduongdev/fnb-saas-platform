@@ -1,0 +1,21 @@
+[ERROR] COMPILATION ERROR : 
+[ERROR] /C:/Workspace/fnb-saas-platform/backend/src/main/java/com/project/fnb/modules/pos/service/SessionService.java:[264,12] cannot find symbol
+  symbol:   class SplitResult
+  location: class com.project.fnb.modules.pos.service.SessionService
+[ERROR] /C:/Workspace/fnb-saas-platform/backend/src/main/java/com/project/fnb/modules/pos/controller/SessionController.java:[150,38] cannot find symbol
+  symbol:   class SplitResult
+  location: class com.project.fnb.modules.pos.service.SessionService
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.14.1:compile (default-compile) on project fnb-platform: Compilation failure: Compilation failure: 
+[ERROR] /C:/Workspace/fnb-saas-platform/backend/src/main/java/com/project/fnb/modules/pos/service/SessionService.java:[264,12] cannot find symbol
+[ERROR]   symbol:   class SplitResult
+[ERROR]   location: class com.project.fnb.modules.pos.service.SessionService
+[ERROR] /C:/Workspace/fnb-saas-platform/backend/src/main/java/com/project/fnb/modules/pos/controller/SessionController.java:[150,38] cannot find symbol
+[ERROR]   symbol:   class SplitResult
+[ERROR]   location: class com.project.fnb.modules.pos.service.SessionService
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

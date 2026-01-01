@@ -1,12 +1,14 @@
 package com.project.fnb.modules.pos.dto;
 
-import com.project.fnb.modules.menu.entity.ProductImage; // Import Entity này
+import com.project.fnb.modules.menu.entity.ProductImage;
+import com.project.fnb.modules.pos.entity.DiningTable;
 import com.project.fnb.modules.pos.entity.Order;
 import com.project.fnb.modules.pos.entity.OrderItem;
 import lombok.Builder;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -33,6 +35,7 @@ public class OrderResponse {
         private String note;
         private OrderItem.ItemStatus status;
         private BigDecimal total;
+        private LocalDateTime createdAt; // Thời gian thêm món
     }
     
     public static OrderResponse fromEntity(Order order) {
@@ -61,14 +64,18 @@ public class OrderResponse {
                             .note(i.getNote())
                             .status(i.getStatus())
                             .total(i.getPrice().multiply(BigDecimal.valueOf(i.getQuantity())))
+                            .createdAt(i.getCreatedAt()) // Thời gian thêm món
                             .build();
                 })
                 .collect(Collectors.toList());
 
+        // Sử dụng getPrimaryTable() để lấy bàn từ session hoặc fallback về table cũ
+        DiningTable table = order.getPrimaryTable();
+
         return OrderResponse.builder()
                 .id(order.getId())
-                .tableId(order.getTable().getId())
-                .tableName(order.getTable().getName())
+                .tableId(table != null ? table.getId() : null)
+                .tableName(table != null ? table.getName() : "N/A")
                 .totalAmount(order.getTotalAmount())
                 .status(order.getStatus())
                 .items(itemDtos)

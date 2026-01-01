@@ -5,6 +5,10 @@ import com.project.fnb.modules.menu.dto.ProductResponse;
 import com.project.fnb.modules.menu.entity.Product;
 import com.project.fnb.modules.menu.service.ProductService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -17,6 +21,21 @@ import java.util.List;
 public class ProductController {
 
     private final ProductService productService;
+
+    /**
+     * Lấy danh sách sản phẩm theo tenant hiện tại.
+     * Hỗ trợ filter theo categoryId và status.
+     */
+    @GetMapping
+    public ApiResponse<Page<ProductResponse>> getProducts(
+            @RequestParam(required = false) Integer categoryId,
+            @RequestParam(required = false) Product.ProductStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size
+    ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("name").ascending());
+        return ApiResponse.success(productService.getProducts(categoryId, status, pageable));
+    }
 
     @GetMapping("/{id}")
     public ApiResponse<ProductResponse> getDetail(@PathVariable Long id) {

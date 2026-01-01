@@ -4,6 +4,8 @@ import com.project.fnb.modules.menu.entity.Product;
 
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -19,4 +21,13 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @NonNull
     @Query("SELECT p FROM Product p WHERE p.id = :id")
     Optional<Product> findById(@NonNull @Param("id") Long id);
+
+    // Find by category
+    Page<Product> findByCategoryId(Integer categoryId, Pageable pageable);
+    
+    // Find by status
+    Page<Product> findByStatus(Product.ProductStatus status, Pageable pageable);
+    
+    // Find by category and status
+    Page<Product> findByCategoryIdAndStatus(Integer categoryId, Product.ProductStatus status, Pageable pageable);
 }
