@@ -1,0 +1,26 @@
+Cấu hình Keycloak
+Truy cập: http://localhost:8080
+Đăng nhập: admin / admin
+Tạo Realm:
+Bấm vào dropdown "Keycloak" (góc trái trên) -> Create Realm.
+Realm name: fnb-platform -> Create.
+Tạo Client cho Backend:
+Menu Clients -> Create client.
+Client ID: fnb-backend
+Next -> Capability config: Bật Client authentication (ON), Service accounts roles (ON). -> Save.
+Tab Credentials: Copy Client Secret (Lưu lại chuỗi này, ta sẽ dùng trong Spring Boot).
+Tạo Client cho Frontend (React):
+Create client -> Client ID: fnb-web
+Next -> Capability config: Client authentication (OFF - Public).
+Valid redirect URIs: http://localhost:3000/*
+Web origins: http://localhost:3000 (để tránh lỗi CORS).
+
+Vào Clients -> fnb-backend.
+Sang tab Service Account Roles.
+Bấm vào Assign role.
+Chọn Filter by client (Dropdown góc trái hộp thoại).
+Gõ tìm realm-management (hoặc realm-admin).
+Cách an toàn nhất: Chọn realm-admin (Quyền to nhất trong Realm này).
+Cách tối ưu: Chọn riêng lẻ manage-groups, view-users, manage-users.
+Bấm Assign.
+Sau khi làm xong bước này, fnb-backend mới có quyền thay mặt hệ thống để tạo Group tenant_{id}_staff.
