@@ -8,7 +8,7 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
 @Entity
-@Table(name = "dining_tables") 
+@Table(name = "dining_tables")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -34,14 +34,22 @@ public class DiningTable extends BaseEntity {
     @Column(name = "qr_code_url", length = 500)
     private String qrCodeUrl;
 
-    // --- Logic Gộp Bàn ---
+    // Table thuộc về Session
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "master_table_id")
-    private DiningTable masterTable;
+    @JoinColumn(name = "current_session_id")
+    private ServingSession currentSession; // NULL = bàn trống
 
     public enum Status {
-        AVAILABLE, // Trống
-        SERVING,   // Có khách
-        RESERVED   // Đã đặt trước
+        AVAILABLE, // Trống, sẵn sàng
+        OCCUPIED, // Đang có khách (thuộc 1 session)
+        RESERVED, // Đã đặt trước
+        SERVING // Legacy: tương đương OCCUPIED, để tương thích dữ liệu cũ
+    }
+
+    /**
+     * Kiểm tra bàn có đang trống không.
+     */
+    public boolean isAvailable() {
+        return currentSession == null && (status == Status.AVAILABLE || status == null);
     }
 }

@@ -12,14 +12,6 @@ import com.project.fnb.modules.pos.entity.Order;
 import com.project.fnb.modules.reporting.dto.HourlyStatDto;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
-    
-    @Query("SELECT o FROM Order o " +
-           "JOIN FETCH o.table " +
-           "LEFT JOIN FETCH o.items i " +
-           "LEFT JOIN FETCH i.product p " +
-           "WHERE o.table.id = :tableId AND o.status = :status")
-    Optional<Order> findByTableIdAndStatusWithDetails(@Param("tableId") Integer tableId, 
-                                                      @Param("status") Order.OrderStatus status);
 
     @Override
     @Query("SELECT o FROM Order o WHERE o.id = :id")

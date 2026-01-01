@@ -1,0 +1,136 @@
+.report-filters {
+    margin-bottom: var(--space-4);
+}
+
+.report-date-range {
+    display: flex;
+    gap: var(--space-4);
+    max-width: 400px;
+}
+
+.report-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+}
+
+.summary-card {
+    text-align: center;
+}
+
+.summary-label {
+    display: block;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    margin-bottom: var(--space-2);
+}
+
+.summary-value {
+    display: block;
+    font-size: var(--text-2xl);
+    font-weight: var(--font-bold);
+    color: var(--primary);
+}
+
+.report-tabs {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+}
+
+.report-tab {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+    color: var(--text-secondary);
+    transition: all 0.15s ease;
+}
+
+.report-tab:hover {
+    background-color: var(--bg-main);
+}
+
+.report-tab.active {
+    background-color: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
+.report-content {
+    min-height: 300px;
+}
+
+.report-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.report-table th,
+.report-table td {
+    padding: var(--space-3) var(--space-4);
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.report-table th {
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    color: var(--text-secondary);
+}
+
+.product-name {
+    font-weight: var(--font-medium);
+}
+
+.revenue-value {
+    font-weight: var(--font-semibold);
+    color: var(--primary);
+}
+
+/* Peak Hours Chart */
+.peak-hours-chart {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-4);
+}
+
+.peak-hour-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.peak-hour-label {
+    width: 50px;
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+}
+
+.peak-hour-track {
+    flex: 1;
+    height: 24px;
+    background-color: var(--bg-main);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.peak-hour-fill {
+    height: 100%;
+    background-color: var(--primary);
+    border-radius: var(--radius);
+    transition: width 0.3s ease;
+}
+
+.peak-hour-value {
+    width: 80px;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}

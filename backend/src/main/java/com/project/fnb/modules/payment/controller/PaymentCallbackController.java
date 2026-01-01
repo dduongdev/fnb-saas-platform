@@ -8,10 +8,13 @@ import com.project.fnb.modules.global.entity.Tenant;
 import com.project.fnb.modules.global.repository.TenantRepository;
 import com.project.fnb.modules.payment.entity.PaymentTransaction;
 import com.project.fnb.modules.payment.repository.PaymentTransactionRepository;
+import com.project.fnb.modules.pos.entity.DiningTable;
 import com.project.fnb.modules.pos.entity.Order;
+import com.project.fnb.modules.pos.entity.ServingSession;
 import com.project.fnb.modules.pos.repository.OrderRepository;
+import com.project.fnb.modules.pos.repository.SessionRepository;
+import com.project.fnb.modules.pos.repository.TableRepository;
 import com.project.fnb.modules.pos.service.OrderService;
-import com.project.fnb.modules.pos.service.TableService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +37,8 @@ public class PaymentCallbackController {
 
     private final OrderRepository orderRepository;
     private final TenantRepository tenantRepository;
-    private final TableService tableService;
+    private final SessionRepository sessionRepository;
+    private final TableRepository tableRepository;
     private final PaymentTransactionRepository transactionRepository;
     private final OrderService orderService;
 
@@ -126,8 +130,19 @@ public class PaymentCallbackController {
                     order.setCompletedAt(LocalDateTime.now());
                     orderRepository.save(order);
 
-                    // Giải phóng bàn & Notify
-                    tableService.releaseTable(order.getTable().getId());
+                    // Giải phóng session & tables
+                    ServingSession session = order.getSession();
+                    if (session != null) {
+                        for (DiningTable table : session.getTables()) {
+                            table.setCurrentSession(null);
+                            table.setStatus(DiningTable.Status.AVAILABLE);
+                        }
+                        tableRepository.saveAll(session.getTables());
+                        session.setStatus(ServingSession.SessionStatus.COMPLETED);
+                        session.setEndedAt(LocalDateTime.now());
+                        sessionRepository.save(session);
+                    }
+                    
                     orderService.notifyPaymentSuccess(order);
                     
                     log.info("✅ VNPay Success: Order #{}", orderId);

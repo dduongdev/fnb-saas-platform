@@ -9,6 +9,6 @@ public class TableDto {
     private Integer id;
     private String name;
     private DiningTable.Status status;
-    private Integer masterId; // Nếu != null -> Đây là bàn phụ
     private String qrCodeUrl;
+    private Long sessionId;
 }

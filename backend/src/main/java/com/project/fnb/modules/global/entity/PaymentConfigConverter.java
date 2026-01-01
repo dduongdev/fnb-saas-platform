@@ -14,7 +14,8 @@ public class PaymentConfigConverter implements AttributeConverter<PaymentConfigD
 
     @Override
     public String convertToDatabaseColumn(PaymentConfigDto attribute) {
-        if (attribute == null) return null;
+        if (attribute == null)
+            return null;
         try {
             String json = objectMapper.writeValueAsString(attribute);
             return CryptoUtils.encrypt(json);
@@ -25,7 +26,8 @@ public class PaymentConfigConverter implements AttributeConverter<PaymentConfigD
 
     @Override
     public PaymentConfigDto convertToEntityAttribute(String dbData) {
-        if (dbData == null || dbData.isBlank()) return null;
+        if (dbData == null || dbData.isBlank())
+            return null;
         try {
             String json = CryptoUtils.decrypt(dbData);
             return objectMapper.readValue(json, PaymentConfigDto.class);

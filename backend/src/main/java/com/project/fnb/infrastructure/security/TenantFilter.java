@@ -18,7 +18,7 @@ public class TenantFilter implements Filter {
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
-        
+
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse res = (HttpServletResponse) response;
 
@@ -26,17 +26,16 @@ public class TenantFilter implements Filter {
         String path = req.getRequestURI();
 
         // 2. Định nghĩa các URL không cần Tenant Context
-        if (path.startsWith("/api/public/") || 
-            path.startsWith("/api/auth/") ||
-            path.startsWith("/api/recruitment/") || 
-            path.startsWith("/api/profile/") || 
-            path.startsWith("/api/tenants")
-        ) {
-            
+        if (path.startsWith("/api/public/") ||
+                path.startsWith("/api/auth/") ||
+                path.startsWith("/api/recruitment/") ||
+                path.startsWith("/api/profile/") ||
+                path.startsWith("/api/tenants")) {
+
             chain.doFilter(request, response);
             return; // Cho qua và không xử lý Tenant nữa
         }
-        
+
         // --- LOGIC BẮT BUỘC ---
         // 3. Nếu là API nghiệp vụ, phải có Header
         String tenantId = req.getHeader(TENANT_HEADER);

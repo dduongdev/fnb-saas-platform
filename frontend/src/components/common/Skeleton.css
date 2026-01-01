@@ -1,0 +1,82 @@
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        #f0f0f0 0%,
+        #e0e0e0 20%,
+        #f0f0f0 40%,
+        #f0f0f0 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: var(--radius);
+}
+
+.skeleton-circle {
+    border-radius: 50%;
+}
+
+.skeleton-rect {
+    border-radius: var(--radius);
+}
+
+.skeleton-text {
+    border-radius: 4px;
+    height: 1em;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+/* Table Skeleton */
+.skeleton-table {
+    width: 100%;
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.skeleton-table-header {
+    padding: var(--space-4);
+    background-color: var(--bg-main);
+}
+
+.skeleton-table-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-4);
+}
+
+.skeleton-table-row {
+    width: 100%;
+}
+
+/* Card Skeleton */
+.skeleton-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: var(--space-4);
+}
+
+.skeleton-card {
+    border-radius: var(--radius);
+    overflow: hidden;
+    background-color: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.skeleton-card-image {
+    width: 100%;
+}
+
+.skeleton-card-content {
+    padding: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
