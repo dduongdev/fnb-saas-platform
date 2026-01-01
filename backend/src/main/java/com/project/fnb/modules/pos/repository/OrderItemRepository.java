@@ -18,12 +18,12 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
     Optional<OrderItem> findById(@Param("id") Long id);
 
     @Query("SELECT new com.project.fnb.modules.reporting.dto.TopProductDto(" +
-           "oi.product.name, SUM(oi.quantity), SUM(oi.price * oi.quantity)) " +
-           "FROM OrderItem oi " +
-           "JOIN oi.order o " +
-           "WHERE o.status = 'COMPLETED' " +
-           "AND o.completedAt BETWEEN :start AND :end " +
-           "GROUP BY oi.product.name " +
-           "ORDER BY SUM(oi.quantity) DESC")
+            "oi.product.id, oi.product.name, SUM(oi.quantity), SUM(oi.price * oi.quantity)) " +
+            "FROM OrderItem oi " +
+            "JOIN oi.order o " +
+            "WHERE o.status = 'COMPLETED' " +
+            "AND o.completedAt BETWEEN :start AND :end " +
+            "GROUP BY oi.product.id, oi.product.name " +
+            "ORDER BY SUM(oi.quantity) DESC")
     List<TopProductDto> findTopSellingProducts(LocalDateTime start, LocalDateTime end, Pageable pageable);
 }

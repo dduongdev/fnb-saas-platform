@@ -274,9 +274,6 @@ export function ProductListPage() {
                                             <button onClick={() => handleOpenEdit(product)} title="Sửa">
                                                 <Pencil size={16} />
                                             </button>
-                                            <button className="delete-btn" onClick={() => handleDeleteClick(product)} title="Xóa">
-                                                <Trash2 size={16} />
-                                            </button>
                                         </div>
                                     </div>
                                 </div>
