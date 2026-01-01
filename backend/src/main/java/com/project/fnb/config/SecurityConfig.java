@@ -34,7 +34,8 @@ public class SecurityConfig {
                                                                 "/v3/api-docs/**",
                                                                 "/swagger-ui/**",
                                                                 "/api/public/**",
-                                                                "/actuator/**")
+                                                                "/actuator/**",
+                                                                "/ws/**")  // WebSocket endpoint
                                                 .permitAll()
                                                 .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
                                                 .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()

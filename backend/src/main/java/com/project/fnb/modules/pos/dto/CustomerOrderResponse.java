@@ -14,7 +14,7 @@ import java.util.List;
 @Data
 @Builder
 public class CustomerOrderResponse {
-    
+
     private Long sessionId;
     private ServingSession.SessionStatus status;
     private String statusMessage;
@@ -23,8 +23,8 @@ public class CustomerOrderResponse {
     private LocalDateTime createdAt;
     private List<OrderItemDto> items;
     private BigDecimal totalAmount;
-    private String rejectReason;  // Lý do từ chối (nếu bị reject)
-    
+    private String rejectReason; // Lý do từ chối (nếu bị reject)
+
     @Data
     @Builder
     public static class OrderItemDto {
@@ -35,8 +35,9 @@ public class CustomerOrderResponse {
         private BigDecimal price;
         private BigDecimal total;
         private String note;
+        private String status;
     }
-    
+
     /**
      * Tạo message mô tả trạng thái cho khách.
      */

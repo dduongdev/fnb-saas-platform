@@ -66,7 +66,7 @@ public class VnPayStrategy implements PaymentStrategy {
         ZonedDateTime now = ZonedDateTime.now(vietnamZone);
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
         String vnp_CreateDate = now.format(formatter);
-        
+
         String vnp_ExpireDate = now.plusMinutes(15).format(formatter);
 
         // 3. Đưa vào Map để sắp xếp
@@ -91,7 +91,7 @@ public class VnPayStrategy implements PaymentStrategy {
         StringBuilder hashData = new StringBuilder();
         StringBuilder query = new StringBuilder();
         Iterator<String> itr = fieldNames.iterator();
-        
+
         try {
             while (itr.hasNext()) {
                 String fieldName = itr.next();
@@ -101,12 +101,12 @@ public class VnPayStrategy implements PaymentStrategy {
                     hashData.append(fieldName);
                     hashData.append('=');
                     hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
-                    
+
                     // Build query
                     query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII.toString()));
                     query.append('=');
                     query.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
-                    
+
                     if (itr.hasNext()) {
                         query.append('&');
                         hashData.append('&');
@@ -121,7 +121,57 @@ public class VnPayStrategy implements PaymentStrategy {
         // Tạo chữ ký bằng SecretKey của Tenant
         String vnp_SecureHash = VNPayUtils.hmacSHA512(vnpConfig.getHashSecret(), hashData.toString());
         queryUrl += "&vnp_SecureHash=" + vnp_SecureHash;
-        
+
         return vnpApiUrl + "?" + queryUrl;
+    }
+
+    @Override
+    public boolean verifyPayment(Map<String, String> params, PaymentConfigDto config) {
+        if (config.getVnpay() == null) {
+            log.error("VNPay config is null");
+            return false;
+        }
+
+        try {
+            // 1. Lấy Secure Hash từ params
+            String vnp_SecureHash = params.get("vnp_SecureHash");
+            if (vnp_SecureHash == null) {
+                return false;
+            }
+
+            // 2. Tạo bản sao để remove field không cần thiết
+            Map<String, String> vnp_Params = new HashMap<>(params);
+            vnp_Params.remove("vnp_SecureHash");
+            vnp_Params.remove("vnp_SecureHashType");
+
+            // 3. Sắp xếp
+            List<String> fieldNames = new ArrayList<>(vnp_Params.keySet());
+            Collections.sort(fieldNames);
+
+            // 4. Build hash data
+            StringBuilder hashData = new StringBuilder();
+            Iterator<String> itr = fieldNames.iterator();
+            while (itr.hasNext()) {
+                String fieldName = itr.next();
+                String fieldValue = vnp_Params.get(fieldName);
+                if ((fieldValue != null) && (fieldValue.length() > 0)) {
+                    // Build hash data
+                    hashData.append(fieldName);
+                    hashData.append('=');
+                    hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+                    if (itr.hasNext()) {
+                        hashData.append('&');
+                    }
+                }
+            }
+
+            // 5. Hash & Compare
+            String secureHash = VNPayUtils.hmacSHA512(config.getVnpay().getHashSecret(), hashData.toString());
+            return secureHash.equals(vnp_SecureHash);
+
+        } catch (Exception e) {
+            log.error("Checksum verification failed", e);
+            return false;
+        }
     }
 }

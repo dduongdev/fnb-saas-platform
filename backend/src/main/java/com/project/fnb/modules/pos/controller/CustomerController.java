@@ -52,30 +52,33 @@ public class CustomerController {
         Tenant tenant = tenantRepository.findById(tenantId).orElseThrow();
 
         // Check xem bàn có session đang active không
-        boolean hasActiveSession = table.getCurrentSession() != null 
+        boolean hasActiveSession = table.getCurrentSession() != null
                 && table.getCurrentSession().getStatus() == ServingSession.SessionStatus.ACTIVE;
 
-        return ApiResponse.success(Map.of(
-            "tableId", table.getId(),
-            "tableName", table.getName(),
-            "tableStatus", table.getStatus().name(),
-            "tenantId", tenantId,
-            "tenantName", tenant.getName(),
-            "tenantLogo", tenant.getLogoUrl() != null ? tenant.getLogoUrl() : "",
-            "hasActiveSession", hasActiveSession,
-            "sessionId", table.getCurrentSession() != null ? table.getCurrentSession().getId() : null
-        ));
+        java.util.HashMap<String, Object> map = new java.util.HashMap<>();
+        map.put("tableId", table.getId());
+        map.put("tableName", table.getName());
+        map.put("tableStatus", table.getStatus().name());
+        map.put("tenantId", tenantId);
+        map.put("tenantName", tenant.getName());
+        map.put("tenantLogo", tenant.getLogoUrl() != null ? tenant.getLogoUrl() : "");
+        map.put("hasActiveSession", hasActiveSession);
+        map.put("sessionId", table.getCurrentSession() != null ? table.getCurrentSession().getId() : null);
+
+        return ApiResponse.success(map);
     }
 
     /**
      * Khách đặt món - tạo pending session.
      * 
-     * <p>Luồng:</p>
+     * <p>
+     * Luồng:
+     * </p>
      * <ul>
-     *   <li>Nếu bàn trống (AVAILABLE) → Tạo session PENDING + items</li>
-     *   <li>Nếu bàn đã có session ACTIVE → Thêm món vào session hiện tại</li>
-     *   <li>Nếu bàn đã có session PENDING → Báo lỗi (đang chờ xác nhận)</li>
-     *   <li>Nếu bàn RESERVED → Báo lỗi</li>
+     * <li>Nếu bàn trống (AVAILABLE) → Tạo session PENDING + items</li>
+     * <li>Nếu bàn đã có session ACTIVE → Thêm món vào session hiện tại</li>
+     * <li>Nếu bàn đã có session PENDING → Báo lỗi (đang chờ xác nhận)</li>
+     * <li>Nếu bàn RESERVED → Báo lỗi</li>
      * </ul>
      */
     @PostMapping("/sessions")
@@ -104,5 +107,30 @@ public class CustomerController {
             @RequestBody @Valid CustomerOrderRequest request) {
         CustomerOrderResponse response = sessionService.addCustomerItems(sessionId, request);
         return ApiResponse.success(response);
+    }
+
+    /**
+     * Khách xóa món khỏi session (chỉ PENDING items).
+     * Cho phép khách tự xóa món mình đã gọi khi còn trạng thái PENDING.
+     * 
+     * @param sessionId ID của session
+     * @param itemId    ID của order item cần xóa
+     * @return Thông báo thành công
+     */
+    @DeleteMapping("/sessions/{sessionId}/items/{itemId}")
+    public ApiResponse<String> removeCustomerItem(
+            @PathVariable Long sessionId,
+            @PathVariable Long itemId) {
+        sessionService.removeItem(sessionId, itemId);
+        return ApiResponse.success("Đã xóa món");
+    }
+
+    /**
+     * Khách yêu cầu thanh toán (Gọi bill).
+     */
+    @PostMapping("/sessions/{sessionId}/request-payment")
+    public ApiResponse<String> requestPayment(@PathVariable Long sessionId) {
+        sessionService.requestPayment(sessionId);
+        return ApiResponse.success("Đã gửi yêu cầu thanh toán");
     }
 }

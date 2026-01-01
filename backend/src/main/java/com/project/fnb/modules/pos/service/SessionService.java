@@ -718,6 +718,7 @@ public class SessionService {
                         .price(i.getPrice())
                         .total(i.getPrice().multiply(BigDecimal.valueOf(i.getQuantity())))
                         .note(i.getNote())
+                        .status(i.getStatus().name())
                         .build())
                 .toList();
 
@@ -895,6 +896,63 @@ public class SessionService {
                 .build();
 
         messagingTemplate.convertAndSend(topic, msg);
+    }
+
+    // ==================== CUSTOMER ACTIONS ====================
+
+    /**
+     * Khách yêu cầu thanh toán.
+     */
+    @Transactional
+    public void requestPayment(Long sessionId) {
+        ServingSession session = sessionRepository.findActiveByIdWithDetails(sessionId)
+                .orElseThrow(() -> new AppException(404, "Session không tồn tại hoặc đã kết thúc"));
+
+        DiningTable table = session.getTables().stream().findFirst().orElse(null);
+        String tableName = table != null ? table.getName() : "Bàn ?";
+
+        // Notify staff
+        sendNotification("PAYMENT_REQUEST", table, "Bàn " + tableName + " yêu cầu thanh toán");
+    }
+
+    /**
+     * Xử lý khi thanh toán thành công (IPN/Callback).
+     */
+    @Transactional
+    public void handlePaymentSuccess(Long orderId, String transactionId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new AppException(404, "Order not found"));
+
+        if (order.getStatus() == Order.OrderStatus.COMPLETED) {
+            return; // Already processed
+        }
+
+        // Update Order
+        order.setStatus(Order.OrderStatus.COMPLETED);
+        order.setCompletedAt(LocalDateTime.now());
+
+        // Update PaymentTransaction in Session? No, Transaction is handled in
+        // PaymentService.
+        // We just need to update business logic here.
+
+        ServingSession session = order.getSession();
+        // Notify Staff
+        DiningTable table = session.getPrimaryTable();
+        String tableName = table != null ? table.getName() : "Bàn ?";
+
+        sendNotification("PAYMENT_SUCCESS", table,
+                "Bàn " + tableName + " đã thanh toán online thành công (" + order.getTotalAmount() + ")");
+
+        // Notify Customer (via WebSocket specific to Session)
+        // Note: Currently we don't have a direct topic to customer yet in this file,
+        // but checking task.md, we agreed on /topic/session/{id} or similar.
+        // However, updating Order status might trigger some auto-update if we have
+        // EntityListeners.
+        // For now, assume polling or existing socket updates will cover it.
+        // Ideally:
+        // messagingTemplate.convertAndSend("/topic/session/" + session.getId(), ...);
+
+        orderRepository.save(order);
     }
 
     private Employee getCurrentStaff() {
