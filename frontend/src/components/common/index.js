@@ -9,5 +9,6 @@ export { Toast } from './Toast';
 export { ConfirmModal } from './ConfirmModal';
 export { Skeleton, TableSkeleton, CardSkeleton } from './Skeleton';
 export { ErrorBoundary } from './ErrorBoundary';
+export { Badge } from './Badge';
 
 

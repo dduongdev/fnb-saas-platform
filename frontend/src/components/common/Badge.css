@@ -1,0 +1,52 @@
+.badge-wrapper {
+    position: relative;
+    display: inline-flex;
+}
+
+.badge-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    font-size: 11px;
+    line-height: 1;
+    font-weight: 600;
+    color: white;
+    background: var(--danger);
+    border-radius: 10px;
+    border: 1px solid var(--bg-card);
+
+    /* Position if wrapper has children */
+    position: relative;
+    top: -1px;
+}
+
+.badge-wrapper>*:not(.badge-indicator)+.badge-indicator {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translate(50%, -50%);
+}
+
+.badge-primary {
+    background: var(--primary);
+}
+
+.badge-secondary {
+    background: var(--text-secondary);
+}
+
+.badge-danger {
+    background: var(--danger);
+}
+
+.badge-warning {
+    background: var(--warning);
+    color: var(--text-main);
+}
+
+.badge-success {
+    background: var(--success);
+}

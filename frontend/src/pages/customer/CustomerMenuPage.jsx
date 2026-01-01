@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { ShoppingCart, Minus, Plus, X, Utensils, Clock, CheckCircle, XCircle, RefreshCw, Trash2 } from 'lucide-react';
+import { ShoppingCart, Minus, Plus, X, Utensils, UtensilsCrossed, Clock, CheckCircle, XCircle, RefreshCw, Trash2, CreditCard, Banknote, Wallet } from 'lucide-react';
 import { Loading, Button, Card, Empty, Input } from '../../components/common';
 import { getPublicMenu, getTableInfo } from '../../api/pos';
 import { createCustomerOrder, getCustomerOrderStatus, addCustomerItems, removeCustomerItem } from '../../api/session';
+import { getPublicPaymentMethods, requestPayment, createPaymentUrl } from '../../api/payment';
 import { useSessionByIdWebSocket } from '../../hooks/useWebSocket';
 import { formatPrice } from '../../utils/format';
 import './CustomerMenuPage.css';
@@ -19,6 +20,11 @@ export function CustomerMenuPage() {
     const [cart, setCart] = useState([]);
     const [showCart, setShowCart] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+
+    // Payment State
+    const [paymentMethods, setPaymentMethods] = useState([]);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [processingPayment, setProcessingPayment] = useState(false);
 
     // Order status tracking - using same structure as backend SessionResponse
     const [session, setSession] = useState(null); // Full session state from backend
@@ -127,6 +133,7 @@ export function CustomerMenuPage() {
         // Ưu tiên lấy tenantId từ URL nếu có
         if (tenantId) {
             localStorage.setItem('tenant_id', tenantId);
+            loadPaymentMethods(tenantId);
         }
 
         if (tableId) {
@@ -135,13 +142,20 @@ export function CustomerMenuPage() {
 
         // Reload table info khi user quay lại trang (để check session existing)
         const handleFocus = () => {
-            if (tableId) {
-                reloadTableInfo();
-            }
+            // ... existing code
         };
         window.addEventListener('focus', handleFocus);
         return () => window.removeEventListener('focus', handleFocus);
     }, [tableId, tenantId]);
+
+    const loadPaymentMethods = async (tid) => {
+        try {
+            const methods = await getPublicPaymentMethods(tid);
+            setPaymentMethods(methods || []);
+        } catch (error) {
+            console.error('Failed to load payment methods', error);
+        }
+    };
 
     const loadData = async () => {
         try {
@@ -327,6 +341,36 @@ export function CustomerMenuPage() {
     const servedItems = orderItems.filter(i => i.status === 'SERVED');
     const sessionTotal = session?.totalAmount || 0;
 
+    const handlePaymentSelect = async (method) => {
+        try {
+            setProcessingPayment(true);
+
+            if (method.code === 'CASH') {
+                await requestPayment(session.sessionId || session.id, tenantId);
+                alert('Đã gửi yêu cầu thanh toán! Nhân viên sẽ đến ngay.');
+                setShowPaymentModal(false);
+            } else {
+                // Online Payment (VNPAY, MOMO)
+                const paymentData = {
+                    orderId: session.sessionId || session.id,
+                    paymentMethodCode: method.code,
+                    amount: session.totalAmount // Optional context
+                };
+
+                // Gọi API lấy URL thanh toán
+                const paymentUrl = await createPaymentUrl(paymentData, tenantId);
+
+                // Redirect sang cổng thanh toán
+                window.location.href = paymentUrl;
+            }
+        } catch (error) {
+            console.error('Payment error:', error);
+            alert('Lỗi: ' + (error.message || 'Không thể xử lý thanh toán'));
+        } finally {
+            setProcessingPayment(false);
+        }
+    };
+
     // Debug logs
     if (session && orderView === 'confirmed') {
         console.log('[Customer] Session data:', {
@@ -449,7 +493,7 @@ export function CustomerMenuPage() {
                     <div className="cart-icon">
                         {cart.length > 0 ? <ShoppingCart size={24} /> : <Utensils size={24} />}
                         <span className="badge">
-                            {cart.length > 0 ? calculateTotalItems(cart) : orderItems.length}
+                            {cart.length > 0 ? totalItems : orderItems.length}
                         </span>
                     </div>
                     <span className="label">
@@ -563,7 +607,7 @@ export function CustomerMenuPage() {
                                     {session?.status === 'ACTIVE' && (
                                         <Button
                                             className="btn-payment"
-                                            onClick={() => alert('Đã gửi yêu cầu thanh toán đến thu ngân!')}
+                                            onClick={() => setShowPaymentModal(true)}
                                         >
                                             Thanh toán / Gọi Bill
                                         </Button>
@@ -577,6 +621,41 @@ export function CustomerMenuPage() {
                                     </Button>
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Payment Method Modal */}
+            {showPaymentModal && (
+                <div className="payment-modal-overlay">
+                    <div className="payment-modal">
+                        <h3>Chọn phương thức thanh toán</h3>
+                        <button className="close-btn" onClick={() => setShowPaymentModal(false)}>
+                            <X size={24} />
+                        </button>
+
+                        <div className="payment-methods-list">
+                            {paymentMethods.map(method => (
+                                <button
+                                    key={method.code}
+                                    className="payment-method-btn"
+                                    onClick={() => handlePaymentSelect(method)}
+                                    disabled={processingPayment}
+                                >
+                                    <div className="method-icon">
+                                        {/* Placeholder icon logic */}
+                                        {method.code === 'CASH' && <UtensilsCrossed size={24} />}
+                                        {method.code === 'VNPAY' && <CreditCard size={24} />}
+                                        {method.code === 'MOMO' && <CreditCard size={24} />}
+                                    </div>
+                                    <div className="method-info">
+                                        <span className="method-name">{method.name}</span>
+                                        <span className="method-desc">
+                                            {method.code === 'CASH' ? 'Gọi nhân viên thanh toán' : 'Thanh toán online ngay'}
+                                        </span>
+                                    </div>
+                                </button>
+                            ))}
                         </div>
                     </div>
                 </div>

@@ -11,7 +11,8 @@ import {
     CreditCard,
     LogOut,
     Store,
-    ClipboardList
+    ClipboardList,
+    Bell
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
@@ -24,6 +25,7 @@ const menuItems = [
             { path: '/pos', icon: ShoppingCart, label: 'Bán hàng' },
             { path: '/tables', icon: Grid, label: 'Sơ đồ bàn' },
             { path: '/sessions', icon: ClipboardList, label: 'Phiên phục vụ' },
+            { path: '/notifications', icon: Bell, label: 'Thông báo' },
         ]
     },
     {

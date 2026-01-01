@@ -21,6 +21,7 @@ import { ApplicationListPage } from './pages/hrm/ApplicationListPage';
 import { CustomerMenuPage } from './pages/customer/CustomerMenuPage';
 import { UserProfilePage } from './pages/auth/UserProfilePage';
 import { PublicTenantListPage } from './pages/auth/PublicTenantListPage';
+import { NotificationsPage } from './pages/notifications/NotificationsPage';
 
 import './styles/global.css';
 
@@ -123,6 +124,16 @@ function AppRoutes() {
           <ProtectedRoute>
             <TenantRoute>
               <POSPage />
+            </TenantRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <TenantRoute>
+              <NotificationsPage />
             </TenantRoute>
           </ProtectedRoute>
         }
