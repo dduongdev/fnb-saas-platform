@@ -25,7 +25,7 @@ import './POSPage.css';
 export function POSPage() {
     const toast = useToast();
     const [searchParams] = useSearchParams();
-    const initialTableId = searchParams.get('table') ? parseInt(searchParams.get('table')) : null;
+    const initialTableId = searchParams.get('table') || null;
 
     const [tables, setTables] = useState([]);
     const [selectedTableId, setSelectedTableId] = useState(initialTableId);
@@ -196,18 +196,6 @@ export function POSPage() {
         loadingSessionRef.current = true;
         try {
             setSessionLoading(true);
-
-            // Nếu đã có session, reload trực tiếp từ sessionId để đảm bảo data mới nhất
-            if (session?.sessionId) {
-                try {
-                    const sessionData = await getSession(session.sessionId);
-                    setSession(sessionData);
-                    return;
-                } catch (err) {
-                    // Session có thể đã bị đóng/hủy, tiếp tục fetch từ table
-                    console.log('Session may be closed, fetching from table...');
-                }
-            }
 
             // Fetch fresh table data từ API để có session info mới nhất
             const freshTables = tablesData || await getTables();
@@ -458,7 +446,7 @@ export function POSPage() {
             setTransferLoading(true);
 
             // 1. Attach bàn mới trước
-            await attachTable(session.sessionId, parseInt(targetTableId));
+            await attachTable(session.sessionId, targetTableId);
 
             // 2. Detach tất cả các bàn cũ hiện có trong session
             if (session.tables && session.tables.length > 0) {
@@ -484,7 +472,7 @@ export function POSPage() {
             setTables(tablesData || []);
 
             // Select the target table
-            setSelectedTableId(parseInt(targetTableId));
+            setSelectedTableId(targetTableId);
         } catch (error) {
             toast.error(error.message);
         } finally {
@@ -647,7 +635,7 @@ export function POSPage() {
                             <Select
                                 label="Chọn bàn"
                                 value={selectedTableId || ''}
-                                onChange={(e) => setSelectedTableId(parseInt(e.target.value))}
+                                onChange={(e) => setSelectedTableId(e.target.value)}
                                 options={tables.map(t => ({
                                     value: t.id,
                                     label: `${t.name}${t.status === 'OCCUPIED' ? ' (Có khách)' : ''}`

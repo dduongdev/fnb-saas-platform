@@ -42,7 +42,7 @@ public class NotificationResponse {
     /**
      * ID của table liên quan (nếu có)
      */
-    private Integer tableId;
+    private String tableId;
     
     /**
      * Tên bàn để hiển thị

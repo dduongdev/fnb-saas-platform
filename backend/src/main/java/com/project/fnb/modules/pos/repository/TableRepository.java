@@ -17,7 +17,7 @@ import java.util.Optional;
  * 
  * @see DiningTable
  */
-public interface TableRepository extends JpaRepository<DiningTable, Integer> {
+public interface TableRepository extends JpaRepository<DiningTable, String> {
     
     /**
      * Lấy tất cả bàn với sort order.
@@ -34,11 +34,11 @@ public interface TableRepository extends JpaRepository<DiningTable, Integer> {
      * 
      * <p><b>Tenant Isolation:</b> Tự động filter theo tenantId qua Hibernate filter.</p>
      * 
-     * @param id Table ID
+     * @param id Table ID (UUID)
      * @return Optional&lt;DiningTable&gt;
      */
     @Override
     @NonNull
     @Query("SELECT t FROM DiningTable t WHERE t.id = :id")
-    Optional<DiningTable> findById(@NonNull @Param("id") Integer id);
+    Optional<DiningTable> findById(@NonNull @Param("id") String id);
 }

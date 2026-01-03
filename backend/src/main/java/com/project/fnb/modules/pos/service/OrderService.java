@@ -110,7 +110,7 @@ public class OrderService {
 
         DiningTable table = order.getPrimaryTable();
         String tableName = table != null ? table.getName() : "N/A";
-        Integer tableId = table != null ? table.getId() : null;
+        String tableId = table != null ? table.getId() : null;
         
         String content = String.format("Đơn hàng #%d tại Bàn %s đã thanh toán thành công qua VNPay (%s)", 
                 order.getId(), 

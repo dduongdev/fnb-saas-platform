@@ -46,13 +46,13 @@ public interface SessionRepository extends JpaRepository<ServingSession, Long> {
      * 
      * <p><b>Use Case:</b> Kiểm tra bàn có khách hay không trước khi mở session mới.</p>
      * 
-     * @param tableId ID của bàn cần kiểm tra
+     * @param tableId ID của bàn cần kiểm tra (UUID)
      * @return Optional&lt;ServingSession&gt; - Empty nếu bàn trống
      */
     @Query("SELECT s FROM ServingSession s " +
            "JOIN s.tables t " +
            "WHERE t.id = :tableId AND s.status = 'ACTIVE'")
-    Optional<ServingSession> findActiveByTableId(@Param("tableId") Integer tableId);
+    Optional<ServingSession> findActiveByTableId(@Param("tableId") String tableId);
 
     /**
      * Tìm session theo ID với đầy đủ thông tin (bất kể status).

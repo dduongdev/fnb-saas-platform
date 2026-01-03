@@ -55,7 +55,7 @@ public class SessionResponse {
     @Data
     @Builder
     public static class SessionTableDto {
-        private Integer id;
+        private String id;
         private String name;
         private DiningTable.Status status;
     }

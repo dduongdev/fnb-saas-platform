@@ -14,7 +14,10 @@ import org.hibernate.annotations.SQLRestriction;
  * Điều này cho phép linh hoạt trong việc gộp bàn và quản lý nhóm khách.</p>
  * 
  * <p><b>QR Code Integration:</b> Mỗi bàn có mã QR riêng để khách quét và order.
- * QR code chứa URL tới trang customer menu với tableId.</p>
+ * QR code chứa URL tới trang customer menu với tableId (UUID).</p>
+ * 
+ * <p><b>Security:</b> Sử dụng UUID thay vì auto-increment ID để tránh 
+ * enumeration attack qua QR code URL.</p>
  * 
  * <p><b>Trạng thái bàn:</b></p>
  * <ul>
@@ -33,7 +36,7 @@ import org.hibernate.annotations.SQLRestriction;
  * </ul>
  * 
  * @author FNB Team
- * @version 1.0
+ * @version 1.1
  * @see ServingSession
  */
 @Entity
@@ -49,8 +52,9 @@ import org.hibernate.annotations.SQLRestriction;
 public class DiningTable extends BaseEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(length = 36)
+    private String id;
 
     @Column(nullable = false, length = 50)
     private String name;

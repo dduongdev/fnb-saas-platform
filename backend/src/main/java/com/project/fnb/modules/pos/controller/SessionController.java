@@ -179,7 +179,7 @@ public class SessionController {
      * @throws AppException 404 nếu bàn không tồn tại
      */
     @GetMapping("/table/{tableId}")
-    public ApiResponse<SessionResponse> getOrCreateByTable(@PathVariable Integer tableId) {
+    public ApiResponse<SessionResponse> getOrCreateByTable(@PathVariable String tableId) {
         ServingSession session = sessionService.getOrCreateByTable(tableId);
         return ApiResponse.success(SessionResponse.fromEntity(session));
     }
@@ -327,7 +327,7 @@ public class SessionController {
     @DeleteMapping("/{sessionId}/tables/{tableId}")
     public ApiResponse<String> detachTable(
             @PathVariable Long sessionId,
-            @PathVariable Integer tableId) {
+            @PathVariable String tableId) {
         sessionService.detachTable(sessionId, tableId);
         return ApiResponse.success("Đã tách bàn khỏi session");
     }

@@ -86,7 +86,7 @@ public class TableController {
      * @throws AppException 404 nếu bàn không tồn tại
      */
     @DeleteMapping("/{id}")
-    public ApiResponse<String> deleteTable(@PathVariable Integer id) {
+    public ApiResponse<String> deleteTable(@PathVariable String id) {
         tableService.deleteTable(id);
         return ApiResponse.success("Đã xóa bàn");
     }

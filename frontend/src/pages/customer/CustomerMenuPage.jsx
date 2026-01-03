@@ -5,7 +5,7 @@ import { Loading, Button, Card, Empty, Input } from '../../components/common';
 import { getPublicMenu, getTableInfo } from '../../api/pos';
 import { createCustomerOrder, getCustomerOrderStatus, addCustomerItems, removeCustomerItem } from '../../api/session';
 import { getPublicPaymentMethods, requestPayment, createPaymentUrl } from '../../api/payment';
-import { useSessionByIdWebSocket } from '../../hooks/useWebSocket';
+import { usePublicTableWebSocket } from '../../hooks/useWebSocket';
 import { formatPrice } from '../../utils/format';
 import './CustomerMenuPage.css';
 
@@ -28,20 +28,35 @@ export function CustomerMenuPage() {
 
     // Order status tracking - using same structure as backend SessionResponse
     const [session, setSession] = useState(null); // Full session state from backend
-    const [orderView, setOrderView] = useState('menu'); // 'menu' | 'pending' | 'confirmed' | 'rejected'
+    const [orderView, setOrderView] = useState('menu'); // 'menu' | 'pending' | 'confirmed' | 'rejected' | 'completed'
     const [actionLoading, setActionLoading] = useState(null); // itemId being processed
 
     // WebSocket: Handle real-time updates - UPDATE STATE DIRECTLY from events
     const handleSessionUpdate = useCallback((data) => {
         console.log('[WS Client] Session full update:', data);
         
+        // Khi session COMPLETED, clear session để customer có thể gọi món mới
+        if (data.status === 'COMPLETED') {
+            console.log('[WS Client] Session COMPLETED - clearing session for new orders');
+            setSession(null);
+            setOrderView('completed');
+            // Show success message briefly then reset to menu
+            setTimeout(() => {
+                setOrderView('menu');
+            }, 5000); // Reset sau 5 giây
+            return;
+        }
+        
         // Normalize data: WebSocket sends SessionResponse format, convert to unified format
-        // so derived data can work consistently
+        // Extract items from orders[0].items (SessionResponse format)
+        const itemsFromOrders = data.orders?.[0]?.items || [];
         const normalizedData = {
             ...data,
             sessionId: data.sessionId || data.id,
-            // Ensure items is accessible at both locations for compatibility
-            items: data.items || data.orders?.[0]?.items || [],
+            // Set items at root level for easy access
+            items: itemsFromOrders,
+            // Remove orders to avoid confusion
+            orders: undefined,
         };
         
         setSession(normalizedData);
@@ -59,7 +74,41 @@ export function CustomerMenuPage() {
     const handleItemEvent = useCallback((event) => {
         console.log('[WS Client] Item event:', event);
 
-        // Update state directly from event like OrderSessionPage
+        // Backend gửi sessionData (full SessionResponse) để tránh race condition
+        // Ưu tiên dùng sessionData nếu có
+        if (event.sessionData) {
+            console.log('[WS Client] Using sessionData from event:', event.sessionData);
+            const data = event.sessionData;
+            
+            // Extract items from orders[0].items (SessionResponse format)
+            const itemsFromOrders = data.orders?.[0]?.items || [];
+            console.log('[WS Client] Items extracted:', itemsFromOrders.length, 'items');
+            
+            const normalizedData = {
+                ...data,
+                sessionId: data.sessionId || data.id,
+                // Set items at root level, clear orders to avoid confusion
+                items: itemsFromOrders,
+                orders: undefined,
+            };
+            setSession(normalizedData);
+            
+            // Update view based on status
+            if (data.status === 'ACTIVE') {
+                setOrderView('confirmed');
+            } else if (data.status === 'CANCELLED') {
+                setOrderView('rejected');
+            } else if (data.status === 'PENDING') {
+                setOrderView('pending');
+            } else if (data.status === 'COMPLETED') {
+                setSession(null);
+                setOrderView('completed');
+                setTimeout(() => setOrderView('menu'), 5000);
+            }
+            return;
+        }
+
+        // Fallback: Update state manually from event (legacy)
         setSession(prev => {
             if (!prev) return prev;
             
@@ -123,11 +172,27 @@ export function CustomerMenuPage() {
         });
     }, []);
 
-    useSessionByIdWebSocket(
-        session?.sessionId,
-        handleSessionUpdate, // onSessionUpdate
-        handleItemEvent, // onItemEvent
-        tenantId // tenantId override for public access
+    // Handle TABLE_TRANSFERRED event - bàn đã được chuyển sang session khác
+    const handleTableTransferred = useCallback((data) => {
+        console.log('[WS Client] Table transferred event:', data);
+        // Reset về trạng thái mặc định - không còn session nào ở bàn này
+        setSession(null);
+        setOrderView('menu');
+        setCart([]); // Clear cart nếu có
+        // Hiển thị thông báo cho customer
+        alert(data.message || 'Bàn đã được chuyển sang vị trí khác. Vui lòng quét QR để tiếp tục.');
+    }, []);
+
+    // State to store effective tenantId from tableInfo
+    const [effectiveTenantId, setEffectiveTenantId] = useState(tenantId);
+
+    // Subscribe to table topic for real-time updates (confirm order, payment, etc.)
+    usePublicTableWebSocket(
+        tableId,
+        effectiveTenantId,
+        handleSessionUpdate, // onSessionUpdate - receives full session when status changes
+        handleItemEvent, // onItemEvent - receives item-level events
+        handleTableTransferred // onTableTransferred - receives when table is detached from session
     );
 
     const fetchCurrentOrder = async (sessionId) => {
@@ -135,7 +200,16 @@ export function CustomerMenuPage() {
             console.log('[Customer] Fetching session:', sessionId);
             const data = await getCustomerOrderStatus(sessionId);
             console.log('[Customer] Session data received:', data);
-            setSession(data);
+            
+            // Normalize data - extract items from orders if needed
+            const itemsFromOrders = data.orders?.[0]?.items || [];
+            const normalizedData = {
+                ...data,
+                sessionId: data.sessionId || data.id,
+                items: data.items || itemsFromOrders,
+                orders: undefined, // Remove to avoid confusion
+            };
+            setSession(normalizedData);
 
             if (data.status === 'ACTIVE') {
                 console.log('[Customer] Session is ACTIVE, showing confirmed view');
@@ -146,6 +220,11 @@ export function CustomerMenuPage() {
             } else if (data.status === 'PENDING') {
                 console.log('[Customer] Session is PENDING, showing pending view');
                 setOrderView('pending');
+            } else if (data.status === 'COMPLETED') {
+                console.log('[Customer] Session is COMPLETED, clearing session');
+                setSession(null);
+                setOrderView('completed');
+                setTimeout(() => setOrderView('menu'), 5000);
             }
         } catch (error) {
             console.error('[Customer] Failed to fetch session:', error);
@@ -156,7 +235,6 @@ export function CustomerMenuPage() {
         // Ưu tiên lấy tenantId từ URL nếu có
         if (tenantId) {
             localStorage.setItem('tenant_id', tenantId);
-            loadPaymentMethods(tenantId);
         }
 
         if (tableId) {
@@ -189,8 +267,13 @@ export function CustomerMenuPage() {
             console.log('[Customer] Table info loaded:', info);
 
             // Set tenant_id from API info if URL param missing
-            if (info.tenantId && !tenantId) {
-                localStorage.setItem('tenant_id', info.tenantId);
+            const resolvedTenantId = tenantId || info.tenantId;
+            if (resolvedTenantId) {
+                localStorage.setItem('tenant_id', resolvedTenantId);
+                // Update effectiveTenantId state for WebSocket subscription
+                setEffectiveTenantId(resolvedTenantId);
+                // Load payment methods với tenantId từ table info
+                loadPaymentMethods(resolvedTenantId);
             }
 
             // 2. Check if table has existing session → load it immediately
@@ -284,7 +367,7 @@ export function CustomerMenuPage() {
             if (tableInfo?.hasActiveSession && tableInfo?.sessionId) {
                 // Add to existing session
                 const result = await addCustomerItems(tableInfo.sessionId, {
-                    tableId: parseInt(tableId),
+                    tableId: tableId,
                     items
                 });
                 setSession(result);
@@ -292,7 +375,7 @@ export function CustomerMenuPage() {
             } else {
                 // Create new pending session
                 const result = await createCustomerOrder({
-                    tableId: parseInt(tableId),
+                    tableId: tableId,
                     items
                 });
                 setSession(result);
@@ -353,13 +436,8 @@ export function CustomerMenuPage() {
         }
     };
 
-    // Derived data - check array length to avoid treating empty array as valid
-    let orderItems = [];
-    if (session?.items && session.items.length > 0) {
-        orderItems = session.items; // REST API: CustomerOrderResponse
-    } else if (session?.orders?.[0]?.items && session.orders[0].items.length > 0) {
-        orderItems = session.orders[0].items; // WebSocket: SessionResponse
-    }
+    // Derived data - items đã được normalize ở root level từ handleSessionUpdate/handleItemEvent
+    const orderItems = session?.items || [];
     const pendingItems = orderItems.filter(i => i.status === 'PENDING');
     const servedItems = orderItems.filter(i => i.status === 'SERVED');
     const sessionTotal = session?.totalAmount || 0;
@@ -370,7 +448,6 @@ export function CustomerMenuPage() {
             sessionId: session.sessionId || session.id,
             status: session.status,
             itemsField: session.items,
-            ordersField: session.orders,
             raw: session
         });
     }
@@ -461,6 +538,12 @@ export function CustomerMenuPage() {
                             <div className="status-content">
                                 <XCircle size={20} />
                                 <span>Đơn hàng bị từ chối</span>
+                            </div>
+                        )}
+                        {session.status === 'COMPLETED' && (
+                            <div className="status-content">
+                                <CheckCircle size={20} />
+                                <span>Đã thanh toán thành công! Cảm ơn quý khách.</span>
                             </div>
                         )}
                         <span className="view-details-link">Xem chi tiết &gt;</span>

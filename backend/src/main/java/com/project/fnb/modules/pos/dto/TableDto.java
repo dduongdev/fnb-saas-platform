@@ -28,7 +28,7 @@ import lombok.Data;
 @Data
 @Builder
 public class TableDto {
-    private Integer id;
+    private String id;
     private String name;
     private DiningTable.Status status;
     private String qrCodeUrl;

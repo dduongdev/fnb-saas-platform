@@ -43,7 +43,7 @@ public class CustomerOrderResponse {
     private Long sessionId;
     private ServingSession.SessionStatus status;
     private String statusMessage;
-    private Integer tableId;
+    private String tableId;
     private String tableName;
     private LocalDateTime createdAt;
     private List<OrderItemDto> items;

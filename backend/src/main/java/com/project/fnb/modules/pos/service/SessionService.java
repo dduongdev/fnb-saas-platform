@@ -134,6 +134,7 @@ public class SessionService {
         // Notify
         sendNotification("NEW_SESSION", table, "Bàn " + table.getName() + " vừa mở phiên mới");
         notifyTableUpdate();
+        notifySessionUpdate(session); // Gửi đến customer đang subscribe table topic
 
         return session;
     }
@@ -149,7 +150,7 @@ public class SessionService {
      * @throws AppException 404 nếu bàn không tồn tại
      */
     @Transactional
-    public ServingSession getOrCreateByTable(Integer tableId) {
+    public ServingSession getOrCreateByTable(String tableId) {
         SessionRequest.OpenSession request = new SessionRequest.OpenSession();
         request.setTableId(tableId);
         return openTable(request);
@@ -219,6 +220,9 @@ public class SessionService {
                     .createdBy(staff)
                     .build();
             orderItem = orderItemRepository.save(orderItem);
+            
+            // Add vào collection để SessionResponse.fromEntity có thể thấy item mới
+            order.getItems().add(orderItem);
 
             BigDecimal itemTotal = product.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
             order.setTotalAmount(order.getTotalAmount().add(itemTotal));
@@ -312,7 +316,7 @@ public class SessionService {
      * @throws AppException 400 nếu session không active hoặc bàn đang có khách
      */
     @Transactional
-    public void attachTable(Long sessionId, Integer tableId) {
+    public void attachTable(Long sessionId, String tableId) {
         ServingSession session = sessionRepository.findActiveByIdWithDetails(sessionId)
                 .orElseThrow(() -> new AppException(404, "Session không tồn tại hoặc đã kết thúc"));
 
@@ -354,7 +358,7 @@ public class SessionService {
      * @throws AppException 400 nếu session không đủ điều kiện tách hoặc chỉ còn 1 bàn
      */
     @Transactional
-    public void detachTable(Long sessionId, Integer tableId) {
+    public void detachTable(Long sessionId, String tableId) {
         ServingSession session = sessionRepository.findByIdWithDetails(sessionId)
                 .orElseThrow(() -> new AppException(404, "Session không tồn tại"));
 
@@ -375,6 +379,9 @@ public class SessionService {
         if (table.getCurrentSession() == null || !table.getCurrentSession().getId().equals(sessionId)) {
             throw new AppException(400, "Bàn không thuộc session này");
         }
+
+        // Gửi notification đến bàn cũ TRƯỚC KHI tách (để customer biết session đã được chuyển đi)
+        notifyTableTransferred(table);
 
         table.setCurrentSession(null);
         table.setStatus(DiningTable.Status.AVAILABLE);
@@ -1092,6 +1099,31 @@ public class SessionService {
             messagingTemplate.convertAndSend(sessionTopic, payload);
         } catch (Exception e) {
             log.error("Socket update error", e);
+        }
+    }
+
+    /**
+     * Helper method: Gửi notification đến bàn khi bàn bị chuyển đi (detach).
+     * 
+     * <p>Gửi event đặc biệt với status=TRANSFERRED để frontend biết session đã được chuyển đi
+     * và reset về trạng thái mặc định.</p>
+     * 
+     * @param table bàn bị tách khỏi session
+     */
+    private void notifyTableTransferred(DiningTable table) {
+        String tenantId = TenantContext.getTenantId();
+        try {
+            String topic = "/topic/tenant/" + tenantId + "/table/" + table.getId();
+            // Gửi event với status đặc biệt để frontend biết cần reset
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("type", "TABLE_TRANSFERRED");
+            payload.put("tableId", table.getId());
+            payload.put("tableName", table.getName());
+            payload.put("message", "Bàn đã được chuyển sang vị trí khác");
+            messagingTemplate.convertAndSend(topic, payload);
+            log.info("Sent TABLE_TRANSFERRED event to table: {}", table.getId());
+        } catch (Exception e) {
+            log.error("Socket update error for table transfer", e);
         }
     }
 

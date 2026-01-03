@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
 @Builder
 public class OrderResponse {
     private Long id;
-    private Integer tableId;
+    private String tableId;
     private String tableName;
     private BigDecimal totalAmount;
     private Order.OrderStatus status;

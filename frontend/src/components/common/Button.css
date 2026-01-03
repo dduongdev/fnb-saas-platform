@@ -12,6 +12,8 @@
     position: relative;
     overflow: hidden;
     user-select: none;
+    line-height: 1;
+    vertical-align: middle;
 }
 
 .btn::before {
@@ -135,13 +137,18 @@
 .btn-icon {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     position: relative;
     z-index: 1;
+    line-height: 1;
 }
 
 .btn-text {
     position: relative;
     z-index: 1;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
 }
 
 .btn-text-loading {

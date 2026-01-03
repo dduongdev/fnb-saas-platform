@@ -36,7 +36,7 @@ import java.util.List;
 public class CustomerOrderRequest {
     
     @NotNull(message = "tableId là bắt buộc")
-    private Integer tableId;
+    private String tableId;
     
     @NotEmpty(message = "items không được rỗng")
     private List<AddItemRequest> items;

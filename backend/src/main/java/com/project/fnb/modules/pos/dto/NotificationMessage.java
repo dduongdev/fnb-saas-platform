@@ -44,6 +44,6 @@ public class NotificationMessage {
     private String type; 
     private String title;
     private String content;
-    private Integer tableId;
+    private String tableId;
     private String tableName;
 }

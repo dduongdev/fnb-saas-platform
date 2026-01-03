@@ -191,6 +191,69 @@ export function useSessionByIdWebSocket(sessionId, onSessionUpdate, onItemEvent,
 }
 
 /**
+ * Hook for public customer page - subscribe by tableId
+ * This is for customers who scan QR code (no login required)
+ * Subscribes to table topic to receive session updates
+ */
+export function usePublicTableWebSocket(tableId, tenantId, onSessionUpdate, onItemEvent, onTableTransferred) {
+    const clientRef = useRef(null);
+
+    const handleMessage = useCallback((data) => {
+        console.log('[WS Public Table] Received message:', data);
+        
+        // Handle TABLE_TRANSFERRED event - bàn đã được chuyển đi
+        if (data.type === 'TABLE_TRANSFERRED') {
+            console.log('[WS Public Table] Table transferred event received');
+            if (onTableTransferred) {
+                onTableTransferred(data);
+            }
+            return;
+        }
+        
+        if (data.type && ['ORDER_ITEM_ADDED', 'ORDER_ITEM_DELETED', 'ORDER_ITEM_SERVED', 'ORDER_ITEM_UPDATED'].includes(data.type)) {
+            if (onItemEvent) {
+                onItemEvent(data);
+            }
+        } else {
+            // Full session update (status changes like PENDING->ACTIVE, ACTIVE->COMPLETED)
+            if (onSessionUpdate) {
+                onSessionUpdate(data);
+            }
+        }
+    }, [onSessionUpdate, onItemEvent, onTableTransferred]);
+
+    useEffect(() => {
+        if (!tenantId || !tableId) {
+            console.log('[WS Public Table] Missing tenantId or tableId, skipping');
+            return;
+        }
+
+        const wsUrl = `${API_BASE_URL}/ws`;
+        const subscriptions = [
+            {
+                destination: `/topic/tenant/${tenantId}/table/${tableId}`,
+                callback: handleMessage
+            }
+        ];
+
+        console.log('[WS Public Table] Subscribing to:', `/topic/tenant/${tenantId}/table/${tableId}`);
+
+        clientRef.current = createStompClient(
+            wsUrl,
+            subscriptions,
+            () => console.log('[WS Public Table] Subscription active for table:', tableId),
+            (err) => console.error('[WS Public Table] Error:', err)
+        );
+
+        return () => {
+            if (clientRef.current) {
+                clientRef.current.deactivate();
+            }
+        };
+    }, [tenantId, tableId, handleMessage]);
+}
+
+/**
  * Hook for table grid real-time updates
  * Subscribe to all tables changes
  */

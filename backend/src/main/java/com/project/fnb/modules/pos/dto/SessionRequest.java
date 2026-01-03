@@ -48,7 +48,7 @@ public class SessionRequest {
     @Data
     public static class OpenSession {
         @NotNull(message = "tableId là bắt buộc")
-        private Integer tableId;
+        private String tableId;
 
         private Integer guestCount;
         private String note;
@@ -71,7 +71,7 @@ public class SessionRequest {
     @Data
     public static class AttachTable {
         @NotNull(message = "tableId là bắt buộc")
-        private Integer tableId;
+        private String tableId;
     }
 
     /**
@@ -91,7 +91,7 @@ public class SessionRequest {
      */
     @Data
     public static class AddItems {
-        private Integer sourceTableId; // optional: bàn nào gọi món
+        private String sourceTableId; // optional: bàn nào gọi món
 
         @NotNull(message = "items là bắt buộc")
         private List<AddItemRequest> items;

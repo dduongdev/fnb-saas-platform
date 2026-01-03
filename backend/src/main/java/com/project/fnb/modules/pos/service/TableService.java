@@ -79,7 +79,7 @@ public class TableService {
 
         // Generate QR Code
         String tenantId = TenantContext.getTenantId();
-        String qrContent = String.format("%s/menu/%s/%d", frontendUrl, tenantId, table.getId());
+        String qrContent = String.format("%s/table/%s", frontendUrl, table.getId());
         MultipartFile qrFile = QrCodeUtils.generateQrCodeImage(qrContent, 300, 300);
         String qrUrl = storageService.uploadTenantImage(qrFile);
         
@@ -123,7 +123,7 @@ public class TableService {
      * @throws AppException 400 nếu bàn đang có khách (currentSession != null)
      */
     @Transactional
-    public void deleteTable(Integer tableId) {
+    public void deleteTable(String tableId) {
         DiningTable table = tableRepository.findById(tableId)
                 .orElseThrow(() -> new AppException(404, "Bàn không tồn tại"));
         

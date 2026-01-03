@@ -226,6 +226,12 @@
     color: #991B1B;
 }
 
+.order-status-banner.completed {
+    background: linear-gradient(135deg, var(--success-light) 0%, #D1FAE5 100%);
+    border-color: var(--success);
+    color: #065F46;
+}
+
 .status-content {
     display: flex;
     align-items: center;

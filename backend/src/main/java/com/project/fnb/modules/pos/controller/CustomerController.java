@@ -92,7 +92,7 @@ public class CustomerController {
      * @throws RuntimeException nếu bàn không tồn tại
      */
     @GetMapping("/info/{tableId}")
-    public ApiResponse<Map<String, Object>> getTableInfo(@PathVariable Integer tableId) {
+    public ApiResponse<Map<String, Object>> getTableInfo(@PathVariable String tableId) {
         DiningTable table = tableRepository.findById(tableId)
                 .orElseThrow(() -> new RuntimeException("Bàn không tồn tại"));
 
