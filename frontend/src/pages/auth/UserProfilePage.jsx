@@ -1,14 +1,17 @@
 import { useState } from 'react';
-import { User, Camera, Mail, Shield } from 'lucide-react';
-import { PageLayout } from '../../components/layout';
+import { useNavigate } from 'react-router-dom';
+import { User, Camera, Mail, Shield, ArrowLeft, Store, LogOut } from 'lucide-react';
 import { Card, Loading, Button } from '../../components/common';
 import { useAuth } from '../../context/AuthContext';
+import { useTenant } from '../../context/TenantContext';
 import { useToast } from '../../context/ToastContext';
 import { uploadAvatar } from '../../api/auth';
 import './UserProfilePage.css';
 
 export function UserProfilePage() {
-    const { user, login } = useAuth(); // login helps refresh user data
+    const navigate = useNavigate();
+    const { user, logout } = useAuth();
+    const { tenant } = useTenant();
     const toast = useToast();
     const [uploading, setUploading] = useState(false);
 
@@ -37,11 +40,37 @@ export function UserProfilePage() {
         }
     };
 
+    const handleBack = () => {
+        if (tenant) {
+            navigate('/pos');
+        } else {
+            navigate('/dashboard');
+        }
+    };
+
     if (!user) return <Loading fullPage />;
 
     return (
-        <PageLayout title="Hồ sơ cá nhân">
-            <div className="user-profile-container">
+        <div className="profile-page-standalone">
+            {/* Simple Header */}
+            <header className="profile-header">
+                <button className="btn-back" onClick={handleBack}>
+                    <ArrowLeft size={20} />
+                </button>
+                <h1>Hồ sơ cá nhân</h1>
+                <div className="header-actions">
+                    {tenant && (
+                        <Button variant="secondary" onClick={() => navigate('/pos')}>
+                            <Store size={16} /> {tenant.name}
+                        </Button>
+                    )}
+                    <button className="btn-logout" onClick={logout}>
+                        <LogOut size={16} /> Đăng xuất
+                    </button>
+                </div>
+            </header>
+
+            <main className="profile-main">
                 <Card className="profile-card">
                     <div className="profile-avatar-section">
                         {user.avatarUrl ? (
@@ -86,7 +115,19 @@ export function UserProfilePage() {
                         </div>
                     </div>
                 </Card>
-            </div>
-        </PageLayout>
+
+                {/* Quick Links */}
+                <div className="profile-links">
+                    <Card className="link-card" onClick={() => navigate('/my-shops')}>
+                        <Store size={24} />
+                        <span>Quán của tôi</span>
+                    </Card>
+                    <Card className="link-card" onClick={() => navigate('/dashboard')}>
+                        <ArrowLeft size={24} />
+                        <span>Về trang chủ</span>
+                    </Card>
+                </div>
+            </main>
+        </div>
     );
 }

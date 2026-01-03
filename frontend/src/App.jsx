@@ -5,7 +5,8 @@ import { ToastProvider } from './context/ToastContext';
 import { Loading } from './components/common';
 
 // Pages
-import { SelectTenantPage } from './pages/auth/SelectTenantPage';
+import { DashboardPage, MyShopsPage } from './pages/dashboard';
+import { UserProfilePage } from './pages/auth/UserProfilePage';
 import { POSPage } from './pages/pos/POSPage';
 import { TableGridPage } from './pages/pos/TableGridPage';
 import { SessionListPage } from './pages/pos/SessionListPage';
@@ -19,7 +20,6 @@ import { PaymentSettingsPage } from './pages/settings/PaymentSettingsPage';
 import { JobListPage } from './pages/hrm/JobListPage';
 import { ApplicationListPage } from './pages/hrm/ApplicationListPage';
 import { CustomerMenuPage } from './pages/customer/CustomerMenuPage';
-import { UserProfilePage } from './pages/auth/UserProfilePage';
 import { PublicTenantListPage } from './pages/auth/PublicTenantListPage';
 import { NotificationsPage } from './pages/notifications/NotificationsPage';
 
@@ -82,7 +82,7 @@ function TenantRoute({ children }) {
   }
 
   if (!tenant) {
-    return <Navigate to="/select-tenant" replace />;
+    return <Navigate to="/my-shops" replace />;
   }
 
   return children;
@@ -107,15 +107,34 @@ function AppRoutes() {
       <Route path="/table/:tableId" element={<CustomerMenuPage />} />
       <Route path="/menu/:tenantId/:tableId" element={<CustomerMenuPage />} />
 
-      {/* Auth Routes */}
+      {/* Dashboard Routes (Protected, No Tenant Required) */}
       <Route
-        path="/select-tenant"
+        path="/dashboard"
         element={
           <ProtectedRoute>
-            <SelectTenantPage />
+            <DashboardPage />
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/my-shops"
+        element={
+          <ProtectedRoute>
+            <MyShopsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <UserProfilePage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Auth Routes */}
+      {/* /select-tenant removed - use /my-shops instead */}
 
       {/* POS Routes */}
       <Route
@@ -269,9 +288,9 @@ function AppRoutes() {
         }
       />
 
-      {/* Default redirect */}
-      <Route path="/" element={<Navigate to="/pos" replace />} />
-      <Route path="*" element={<Navigate to="/pos" replace />} />
+      {/* Default redirect - Đăng nhập xong vào Dashboard */}
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }
