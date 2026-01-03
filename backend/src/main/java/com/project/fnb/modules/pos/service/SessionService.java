@@ -68,6 +68,7 @@ public class SessionService {
     private final TenantRepository tenantRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final ApplicationEventPublisher eventPublisher;
+    private final NotificationService notificationService;
 
     /**
      * Mở bàn và tạo session mới với trạng thái ACTIVE.
@@ -920,7 +921,10 @@ public class SessionService {
                     .status(OrderItem.ItemStatus.PENDING)
                     .createdBy(null) // Customer order
                     .build();
-            orderItemRepository.save(orderItem);
+            orderItem = orderItemRepository.save(orderItem);
+            
+            // CRITICAL: Add item to order's items collection for in-memory access
+            order.getItems().add(orderItem);
 
             BigDecimal itemTotal = product.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
             order.setTotalAmount(order.getTotalAmount().add(itemTotal));
@@ -1181,28 +1185,45 @@ public class SessionService {
     }
 
     /**
-     * Helper method: Gửi thông báo chung qua WebSocket.
+     * Helper method: Gửi thông báo chung qua WebSocket và lưu vào database.
      * 
      * <p>Topic: {@code /topic/tenant/{tenantId}/notifications}</p>
-     * <p>Thông báo sẽ hiển thị trên UI của nhân viên.</p>
+     * <p>Thông báo sẽ hiển thị trên UI của nhân viên và được lưu lại để xem sau.</p>
      * 
      * @param type loại thông báo (NEW_SESSION, PAYMENT_REQUEST, ...)
      * @param table bàn liên quan
      * @param content nội dung thông báo
      */
     private void sendNotification(String type, DiningTable table, String content) {
-        String tenantId = TenantContext.getTenantId();
-        String topic = "/topic/tenant/" + tenantId + "/notifications";
-
-        NotificationMessage msg = NotificationMessage.builder()
-                .type(type)
-                .title("Thông báo mới")
-                .content(content)
-                .tableId(table != null ? table.getId() : null)
-                .tableName(table != null ? table.getName() : null)
-                .build();
-
-        messagingTemplate.convertAndSend(topic, msg);
+        // Determine priority based on notification type
+        Notification.Priority priority = switch (type) {
+            case "CUSTOMER_ORDER", "PAYMENT_REQUEST", "PAYMENT_REQUESTED" -> Notification.Priority.HIGH;
+            case "NEW_ITEM", "REMOVE_ITEM", "UPDATE_ITEM" -> Notification.Priority.MEDIUM;
+            default -> Notification.Priority.LOW;
+        };
+        
+        // Determine title based on type
+        String title = switch (type) {
+            case "CUSTOMER_ORDER" -> "🔔 Đơn hàng mới";
+            case "NEW_SESSION" -> "📋 Mở bàn mới";
+            case "NEW_ITEM" -> "➕ Thêm món";
+            case "REMOVE_ITEM" -> "➖ Xóa món";
+            case "UPDATE_ITEM" -> "✏️ Cập nhật món";
+            case "SERVE_ITEM" -> "🍽️ Mang món";
+            case "PAYMENT_REQUEST", "PAYMENT_REQUESTED" -> "💰 Yêu cầu thanh toán";
+            case "PAYMENT_SUCCESS" -> "✅ Thanh toán thành công";
+            case "SESSION_CONFIRMED" -> "✅ Xác nhận đơn";
+            case "SESSION_REJECTED" -> "❌ Từ chối đơn";
+            case "ATTACH_TABLE" -> "🔗 Gộp bàn";
+            case "DETACH_TABLE" -> "✂️ Tách bàn";
+            default -> "Thông báo mới";
+        };
+        
+        // Get current session from table if available
+        ServingSession session = table != null ? table.getCurrentSession() : null;
+        
+        // Save to database and send via WebSocket
+        notificationService.createAndSend(type, title, content, priority, session, table);
     }
 
     /**

@@ -426,15 +426,25 @@ export function POSPage() {
 
         try {
             await cancelSession(session.sessionId);
+            // Clear session state immediately
             setSession(null);
             toast.success('Đã hủy phiên phục vụ');
             setShowCancelModal(false);
 
+            // Reload tables to update status
             const tablesData = await getTables();
             setTables(tablesData || []);
 
+            // Force reload from table (not from cached session)
             if (selectedTableId) {
-                await loadSession(selectedTableId);
+                const table = tablesData.find(t => t.id === selectedTableId);
+                if (table?.sessionId) {
+                    const sessionData = await getSession(table.sessionId);
+                    setSession(sessionData);
+                } else {
+                    // Table has no session - ensure state is null
+                    setSession(null);
+                }
             }
         } catch (error) {
             toast.error(error.message);

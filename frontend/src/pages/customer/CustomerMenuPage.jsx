@@ -34,7 +34,17 @@ export function CustomerMenuPage() {
     // WebSocket: Handle real-time updates - UPDATE STATE DIRECTLY from events
     const handleSessionUpdate = useCallback((data) => {
         console.log('[WS Client] Session full update:', data);
-        setSession(data);
+        
+        // Normalize data: WebSocket sends SessionResponse format, convert to unified format
+        // so derived data can work consistently
+        const normalizedData = {
+            ...data,
+            sessionId: data.sessionId || data.id,
+            // Ensure items is accessible at both locations for compatibility
+            items: data.items || data.orders?.[0]?.items || [],
+        };
+        
+        setSession(normalizedData);
 
         // Update view based on status
         if (data.status === 'ACTIVE') {
@@ -52,10 +62,14 @@ export function CustomerMenuPage() {
         // Update state directly from event like OrderSessionPage
         setSession(prev => {
             if (!prev) return prev;
-            const order = prev.orders?.[0];
-            if (!order) return prev;
+            
+            // Handle both CustomerOrderResponse (items at root) and SessionResponse (orders[0].items)
+            const hasOrdersFormat = prev.orders && prev.orders.length > 0;
+            const currentItems = hasOrdersFormat 
+                ? [...(prev.orders[0].items || [])]
+                : [...(prev.items || [])];
 
-            let newItems = [...(order.items || [])];
+            let newItems = currentItems;
 
             switch (event.type) {
                 case 'ORDER_ITEM_ADDED':
@@ -89,14 +103,23 @@ export function CustomerMenuPage() {
                     break;
             }
 
-            return {
-                ...prev,
-                totalAmount: event.newTotalAmount,
-                orders: [{
-                    ...order,
+            // Return in the same format as received
+            if (hasOrdersFormat) {
+                return {
+                    ...prev,
+                    totalAmount: event.newTotalAmount,
+                    orders: [{
+                        ...prev.orders[0],
+                        items: newItems
+                    }]
+                };
+            } else {
+                return {
+                    ...prev,
+                    totalAmount: event.newTotalAmount,
                     items: newItems
-                }]
-            };
+                };
+            }
         });
     }, []);
 
@@ -330,16 +353,27 @@ export function CustomerMenuPage() {
         }
     };
 
-    // Derived data
+    // Derived data - check array length to avoid treating empty array as valid
     let orderItems = [];
-    if (session?.items) {
+    if (session?.items && session.items.length > 0) {
         orderItems = session.items; // REST API: CustomerOrderResponse
-    } else if (session?.orders?.[0]?.items) {
+    } else if (session?.orders?.[0]?.items && session.orders[0].items.length > 0) {
         orderItems = session.orders[0].items; // WebSocket: SessionResponse
     }
     const pendingItems = orderItems.filter(i => i.status === 'PENDING');
     const servedItems = orderItems.filter(i => i.status === 'SERVED');
     const sessionTotal = session?.totalAmount || 0;
+    
+    // Debug: Log session data khi có vấn đề
+    if (session && orderItems.length === 0) {
+        console.warn('[Customer] Session exists but no items found:', {
+            sessionId: session.sessionId || session.id,
+            status: session.status,
+            itemsField: session.items,
+            ordersField: session.orders,
+            raw: session
+        });
+    }
 
     const handlePaymentSelect = async (method) => {
         try {
