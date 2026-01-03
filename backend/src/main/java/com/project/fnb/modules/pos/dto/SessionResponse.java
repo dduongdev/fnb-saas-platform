@@ -12,7 +12,32 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * DTO response cho Session API.
+ * Response DTO cho Session API - Chứa thông tin đầy đủ của một session.
+ * 
+ * <p><b>Purpose:</b> DTO này được sử dụng để trả về thông tin session cho staff POS UI,
+ * bao gồm danh sách bàn, orders, items, và tổng tiền.</p>
+ * 
+ * <p><b>Fields:</b></p>
+ * <ul>
+ *   <li>sessionId: ID duy nhất của session</li>
+ *   <li>status: Trạng thái (PENDING, ACTIVE, COMPLETED, CANCELLED)</li>
+ *   <li>startedAt, endedAt: Thời gian bắt đầu và kết thúc session</li>
+ *   <li>guestCount: Số khách</li>
+ *   <li>note: Ghi chú session</li>
+ *   <li>tables: Danh sách bàn trong session (có thể nhiều bàn merged)</li>
+ *   <li>orders: Danh sách orders thuộc session, mỗi order gắn với 1 bàn</li>
+ *   <li>totalAmount: Tổng tiền của tất cả orders trong session</li>
+ * </ul>
+ * 
+ * <p><b>Use Cases:</b></p>
+ * <ul>
+ *   <li>Response của API {@code GET /api/pos/sessions/{id}}</li>
+ *   <li>WebSocket updates qua topic {@code /topic/tenant/{tenantId}/sessions}</li>
+ *   <li>Hiển thị chi tiết session trong POS UI</li>
+ * </ul>
+ * 
+ * @see com.project.fnb.modules.pos.entity.ServingSession
+ * @see com.project.fnb.modules.pos.service.SessionService
  */
 @Data
 @Builder
@@ -46,6 +71,17 @@ public class SessionResponse {
 
     /**
      * Convert từ Entity sang DTO.
+     * 
+     * <p><b>Conversion Logic:</b></p>
+     * <ul>
+     *   <li>tables: Map từ session.getTables() sang SessionTableDto</li>
+     *   <li>orders: Map từ session.getOrders() sang SessionOrderDto, mỗi order chứa items</li>
+     *   <li>items: Sắp xếp theo createdAt giảm dần (mới nhất lên đầu)</li>
+     *   <li>totalAmount: Tổng của tất cả order.totalAmount</li>
+     * </ul>
+     * 
+     * @param session ServingSession entity cần convert
+     * @return SessionResponse DTO
      */
     public static SessionResponse fromEntity(ServingSession session) {
         List<SessionTableDto> tableDtos = session.getTables().stream()

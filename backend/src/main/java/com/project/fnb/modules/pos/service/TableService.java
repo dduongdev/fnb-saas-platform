@@ -21,9 +21,27 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * TableService - Quản lý CRUD bàn ăn.
+ * Service quản lý CRUD bàn ăn (Dining Tables).
  * 
- * <p>Các nghiệp vụ merge/split/release đã được chuyển sang SessionService.</p>
+ * <p><b>Scope:</b> Chỉ xử lý CRUD cơ bản cho bàn ăn. Các nghiệp vụ phức tạp như
+ * merge/split/release tables đã được chuyển sang {@link SessionService}.</p>
+ * 
+ * <p><b>Business Rules:</b></p>
+ * <ul>
+ *   <li>Mỗi bàn có QR code duy nhất để khách quét và order</li>
+ *   <li>Không được xóa bàn đang có khách (currentSession != null)</li>
+ *   <li>Mọi thay đổi sẽ push realtime qua WebSocket topic {@code /topic/tenant/{tenantId}/tables}</li>
+ * </ul>
+ * 
+ * <p><b>Use Cases:</b></p>
+ * <ul>
+ *   <li>Tạo bàn mới khi mở nhà hàng hoặc mở rộng phòng bàn</li>
+ *   <li>Xóa bàn khi giảm sức chứa hoặc đóng cửa phòng bàn</li>
+ *   <li>Lấy danh sách bàn để hiển thị floor map</li>
+ * </ul>
+ * 
+ * @see SessionService
+ * @see DiningTable
  */
 @Service
 @RequiredArgsConstructor
@@ -38,7 +56,17 @@ public class TableService {
     private String frontendUrl;
 
     /**
-     * Tạo bàn mới với QR code.
+     * Tạo bàn ăn mới với QR code tự động.
+     * 
+     * <p><b>QR Code Generation:</b> Tạo QR code với format: {@code {frontendUrl}/menu/{tenantId}/{tableId}}
+     * để khách có thể quét và truy cập menu đặt món.</p>
+     * 
+     * <p><b>WebSocket:</b> Sau khi tạo thành công, push event qua topic {@code /topic/tenant/{tenantId}/tables}
+     * để cập nhật UI floor map realtime.</p>
+     * 
+     * @param name Tên bàn (VD: "Bàn 01", "VIP 1")
+     * @return TableDto chứa thông tin bàn mới tạo kèm QR code URL
+     * @throws AppException nếu có lỗi khi upload QR code lên storage
      */
     @Transactional
     public TableDto createTable(String name) {
@@ -63,7 +91,17 @@ public class TableService {
     }
 
     /**
-     * Lấy danh sách bàn.
+     * Lấy danh sách tất cả bàn ăn trong tenant hiện tại.
+     * 
+     * <p><b>Sort Order:</b> Danh sách được sắp xếp theo tên bàn (a-z).</p>
+     * 
+     * <p><b>Use Cases:</b></p>
+     * <ul>
+     *   <li>Hiển thị floor map (sơ đồ bàn) trong POS UI</li>
+     *   <li>Hiển thị dropdown chọn bàn khi mở session mới</li>
+     * </ul>
+     * 
+     * @return Danh sách TableDto chứa id, name, status, sessionId, qrCodeUrl
      */
     public List<TableDto> getTables() {
         return tableRepository.findAll(Sort.by("name")).stream()
@@ -72,7 +110,17 @@ public class TableService {
     }
 
     /**
-     * Xóa bàn (soft delete).
+     * Xóa bàn ăn (hard delete).
+     * 
+     * <p><b>Business Constraint:</b> Không được phép xóa bàn đang có khách
+     * (currentSession != null). Phải thu tiền và đóng session trước khi xóa bàn.</p>
+     * 
+     * <p><b>WebSocket:</b> Sau khi xóa thành công, push event qua topic {@code /topic/tenant/{tenantId}/tables}
+     * để cập nhật UI floor map.</p>
+     * 
+     * @param tableId ID của bàn cần xóa
+     * @throws AppException 404 nếu bàn không tồn tại
+     * @throws AppException 400 nếu bàn đang có khách (currentSession != null)
      */
     @Transactional
     public void deleteTable(Integer tableId) {

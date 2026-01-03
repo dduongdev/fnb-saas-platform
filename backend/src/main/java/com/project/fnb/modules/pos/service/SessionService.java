@@ -26,12 +26,33 @@ import java.util.HashSet;
 import java.util.List;
 
 /**
- * Service quản lý Session (phiên phục vụ).
+ * Service quản lý phiên phục vụ (Serving Session) trong hệ thống POS.
  * 
- * <p>
- * Session-based design thay thế việc gắn Order trực tiếp vào Table.
- * Một Session đại diện cho một lần phục vụ khách hàng.
- * </p>
+ * <p>Service này cung cấp các chức năng cốt lõi của session-based model:</p>
+ * <ul>
+ *   <li>Quản lý vòng đời session: PENDING → ACTIVE → COMPLETED/CANCELLED</li>
+ *   <li>Thao tác bàn: Attach (gộp bàn), Detach (tách bàn)</li>
+ *   <li>Quản lý order items: Thêm, sửa, xóa, serve món</li>
+ *   <li>Xử lý đặt món từ khách qua QR code</li>
+ *   <li>Thanh toán và đóng session</li>
+ *   <li>WebSocket realtime notifications</li>
+ * </ul>
+ * 
+ * <p><b>Session-based Model:</b> Session là khái niệm trung tâm thay thế việc gắn Order trực tiếp vào Table.
+ * Một Session đại diện cho một lần phục vụ khách hàng - từ khi ngồi xuống đến khi thanh toán.</p>
+ * 
+ * <p><b>Business Invariants:</b></p>
+ * <ul>
+ *   <li>Session LUÔN có ít nhất 1 bàn</li>
+ *   <li>Một bàn chỉ thuộc tối đa 1 Session ACTIVE</li>
+ *   <li>Chỉ cho phép xóa/sửa món có status PENDING</li>
+ *   <li>Sau khi thanh toán (COMPLETED), tất cả bàn được giải phóng</li>
+ * </ul>
+ * 
+ * @author FNB Team
+ * @version 1.0
+ * @see ServingSession
+ * @see SessionRepository
  */
 @Service
 @RequiredArgsConstructor
@@ -48,11 +69,24 @@ public class SessionService {
     private final SimpMessagingTemplate messagingTemplate;
     private final ApplicationEventPublisher eventPublisher;
 
-    // ==================== 1. MỞ BÀN (TẠO SESSION) ====================
-
     /**
-     * Mở bàn / Tạo session mới.
-     * Nếu bàn đã có session đang active thì trả về session đó.
+     * Mở bàn và tạo session mới với trạng thái ACTIVE.
+     * 
+     * <p>Nếu bàn đã có session đang active, method sẽ trả về session đó thay vì tạo mới.
+     * Điều này đảm bảo tính nhất quán và tránh duplicate sessions.</p>
+     * 
+     * <p><b>Quy trình:</b></p>
+     * <ol>
+     *   <li>Kiểm tra bàn có session active không</li>
+     *   <li>Tạo session mới với status ACTIVE</li>
+     *   <li>Gán bàn vào session và đổi trạng thái bàn sang OCCUPIED</li>
+     *   <li>Tạo order mặc định cho session</li>
+     *   <li>Gửi WebSocket notifications</li>
+     * </ol>
+     * 
+     * @param request chứa tableId, guestCount, note
+     * @return ServingSession đã tạo hoặc session hiện tại nếu bàn đang active
+     * @throws AppException 404 nếu bàn không tồn tại
      */
     @Transactional
     public ServingSession openTable(SessionRequest.OpenSession request) {
@@ -104,8 +138,14 @@ public class SessionService {
     }
 
     /**
-     * Lấy session theo tableId (dùng khi quét QR).
-     * Tự động tạo session mới nếu chưa có.
+     * Lấy hoặc tạo session theo table ID.
+     * 
+     * <p>Method này được sử dụng khi khách quét QR code tại bàn.
+     * Nếu bàn chưa có session, tự động tạo mới với trạng thái ACTIVE.</p>
+     * 
+     * @param tableId ID của bàn
+     * @return ServingSession hiện tại hoặc mới tạo
+     * @throws AppException 404 nếu bàn không tồn tại
      */
     @Transactional
     public ServingSession getOrCreateByTable(Integer tableId) {
@@ -115,17 +155,33 @@ public class SessionService {
     }
 
     /**
-     * Lấy session theo ID.
+     * Lấy session theo ID với đầy đủ thông tin liên quan.
+     * 
+     * @param sessionId ID của session
+     * @return ServingSession với orders, tables, items được load
+     * @throws AppException 404 nếu session không tồn tại
      */
     public ServingSession getSession(Long sessionId) {
         return sessionRepository.findByIdWithDetails(sessionId)
                 .orElseThrow(() -> new AppException(404, "Session không tồn tại"));
     }
 
-    // ==================== 2. THÊM MÓN ====================
-
     /**
-     * Thêm món vào session.
+     * Thêm danh sách món vào session.
+     * 
+     * <p><b>Quy trình:</b></p>
+     * <ol>
+     *   <li>Validate session phải ở trạng thái ACTIVE</li>
+     *   <li>Kiểm tra tồn kho cho từng món</li>
+     *   <li>Tạo OrderItem với giá snapshot tại thời điểm order</li>
+     *   <li>Cập nhật tổng tiền của order</li>
+     *   <li>Gửi WebSocket notification cho mỗi item được thêm</li>
+     * </ol>
+     * 
+     * @param sessionId ID của session
+     * @param request chứa danh sách món cần thêm (productId, quantity, note)
+     * @throws AppException 404 nếu session/product không tồn tại
+     * @throws AppException 400 nếu session không active hoặc món hết hàng
      */
     @Transactional
     public void addItems(Long sessionId, SessionRequest.AddItems request) {
@@ -178,7 +234,23 @@ public class SessionService {
 
     /**
      * Xóa món khỏi session.
-     * Chỉ cho phép xóa món có status PENDING (chưa được ra món).
+     * 
+     * <p><b>Business Rule:</b> Chỉ cho phép xóa món có status PENDING (chưa được ra món).
+     * Món đã SERVED hoặc CANCELLED không thể xóa.</p>
+     * 
+     * <p><b>Quy trình:</b></p>
+     * <ol>
+     *   <li>Kiểm tra món thuộc session và có status PENDING</li>
+     *   <li>Trừ tiền món khỏi tổng order</li>
+     *   <li>Xóa item khỏi collection và database</li>
+     *   <li>Gửi WebSocket delete event</li>
+     * </ol>
+     * 
+     * @param sessionId ID của session
+     * @param itemId ID của order item cần xóa
+     * @throws AppException 404 nếu session/item không tồn tại
+     * @throws AppException 400 nếu item không thuộc session
+     * @throws AppException 409 nếu item không ở trạng thái PENDING
      */
     @Transactional
     public void removeItem(Long sessionId, Long itemId) {
@@ -220,12 +292,23 @@ public class SessionService {
                 "Bàn " + session.getTableNames() + " vừa xóa món");
     }
 
-    // ==================== 3. QUẢN LÝ BÀN TRONG SESSION (ATTACH / DETACH)
-    // ====================
-
     /**
-     * Attach Table (Thêm bàn vào session).
-     * Thay thế cho Merge Table logic phức tạp cũ.
+     * Gộp bàn vào session (Attach Table).
+     * 
+     * <p>Method này thay thế cho merge table logic phức tạp cũ.
+     * Cho phép thêm bàn trống vào session đang active để phục vụ nhóm lớn hoặc gộp chỗ.</p>
+     * 
+     * <p><b>Business Rules:</b></p>
+     * <ul>
+     *   <li>Session phải ở trạng thái ACTIVE</li>
+     *   <li>Bàn cần attach phải ở trạng thái AVAILABLE</li>
+     *   <li>Sau khi attach, bàn chuyển sang OCCUPIED và thuộc session</li>
+     * </ul>
+     * 
+     * @param sessionId ID của session
+     * @param tableId ID của bàn cần gộp vào
+     * @throws AppException 404 nếu session/table không tồn tại
+     * @throws AppException 400 nếu session không active hoặc bàn đang có khách
      */
     @Transactional
     public void attachTable(Long sessionId, Integer tableId) {
@@ -252,9 +335,22 @@ public class SessionService {
     }
 
     /**
-     * Detach Table (Bỏ bàn khỏi session).
-     * Cho phép khi session đang ACTIVE hoặc COMPLETED.
-     * Ràng buộc: Session phải có ít nhất 1 bàn sau khi tách.
+     * Tách bàn khỏi session (Detach Table).
+     * 
+     * <p>Cho phép tách bàn khi một phần khách rời đi trong khi session vẫn tiếp tục.
+     * Bàn được tách sẽ chuyển về trạng thái AVAILABLE và có thể phục vụ khách mới.</p>
+     * 
+     * <p><b>Business Rules:</b></p>
+     * <ul>
+     *   <li>Session phải ở trạng thái ACTIVE hoặc COMPLETED</li>
+     *   <li>Session phải có ít nhất 2 bàn (không thể tách bàn cuối cùng)</li>
+     *   <li>Bàn phải thuộc session hiện tại</li>
+     * </ul>
+     * 
+     * @param sessionId ID của session
+     * @param tableId ID của bàn cần tách ra
+     * @throws AppException 404 nếu session/table không tồn tại
+     * @throws AppException 400 nếu session không đủ điều kiện tách hoặc chỉ còn 1 bàn
      */
     @Transactional
     public void detachTable(Long sessionId, Integer tableId) {
@@ -292,8 +388,25 @@ public class SessionService {
     }
 
     /**
-     * Cập nhật số lượng món trong session (US-14).
-     * Chỉ cho phép cập nhật món có status PENDING.
+     * Cập nhật số lượng món trong session.
+     * 
+     * <p><b>Business Rule:</b> Chỉ cho phép cập nhật món có status PENDING.
+     * Món đã SERVED hoặc CANCELLED không thể thay đổi số lượng.</p>
+     * 
+     * <p><b>Quy trình:</b></p>
+     * <ol>
+     *   <li>Validate số lượng mới >= 1</li>
+     *   <li>Kiểm tra item có status PENDING</li>
+     *   <li>Tính lại tổng tiền order dựa trên số lượng mới</li>
+     *   <li>Gửi WebSocket update event</li>
+     * </ol>
+     * 
+     * @param sessionId ID của session
+     * @param itemId ID của order item
+     * @param newQuantity số lượng mới (phải >= 1)
+     * @throws AppException 400 nếu số lượng < 1 hoặc session không active
+     * @throws AppException 404 nếu session/item không tồn tại
+     * @throws AppException 409 nếu item không ở trạng thái PENDING
      */
     @Transactional
     public void updateItemQuantity(Long sessionId, Long itemId, Integer newQuantity) {
@@ -339,12 +452,18 @@ public class SessionService {
     }
 
     /**
-     * Đánh dấu món đã mang ra (SERVE).
-     * Chỉ cho phép với món có status PENDING.
+     * Đánh dấu món đã mang ra cho khách (Serve Item).
+     * 
+     * <p><b>Business Rule:</b> Chỉ cho phép serve món có status PENDING.
+     * Món đã SERVED hoặc CANCELLED không thể thay đổi trạng thái.</p>
+     * 
+     * <p>Method này được nhân viên bếp/phục vụ sử dụng để cập nhật trạng thái món
+     * sau khi mang ra cho khách. WebSocket notification sẽ được gửi đến cả nhân viên và khách.</p>
      * 
      * @param sessionId ID của session
-     * @param itemId    ID của order item
+     * @param itemId ID của order item cần đánh dấu đã serve
      * @throws AppException 404 nếu session/item không tồn tại
+     * @throws AppException 400 nếu item không thuộc session
      * @throws AppException 409 nếu item không ở trạng thái PENDING
      */
     @Transactional
@@ -379,22 +498,27 @@ public class SessionService {
                 "Bàn " + session.getTableNames() + ": Đã mang ra món " + item.getProduct().getName());
     }
 
-    // ==================== [REMOVED] LEGACY OPERATIONS ====================
-    // Các operations sau đã được LOẠI BỎ theo refactor Session-based thuần túy:
-    // - mergeTables() -> Thay bằng attachTable()
-    // - splitSession() -> KHÔNG HỖ TRỢ split bill. Chỉ cho phép detachTable()
-    // - transferSession() -> Thay bằng sequence: attachTable(new) +
-    // detachTable(old)
-    //
-    // Lý do:
-    // - Đơn giản hóa nghiệp vụ
-    // - Loại bỏ logic phức tạp không cần thiết cho quán F&B nhỏ-trung
-    // - Tập trung vào 2 hành vi cốt lõi: Attach và Detach table
-
-    // ==================== 6. THANH TOÁN ====================
-
     /**
      * Thanh toán và đóng session.
+     * 
+     * <p><b>Quy trình:</b></p>
+     * <ol>
+     *   <li>Validate nhân viên có quyền thanh toán</li>
+     *   <li>Đóng tất cả orders trong session (chuyển sang COMPLETED)</li>
+     *   <li>Giải phóng tất cả bàn (chuyển về AVAILABLE)</li>
+     *   <li>Đóng session (chuyển sang COMPLETED)</li>
+     *   <li>Gửi WebSocket notifications</li>
+     *   <li>Publish OrderPaidEvent để cập nhật báo cáo</li>
+     *   <li>Tạo và trả về hóa đơn</li>
+     * </ol>
+     * 
+     * <p><b>Payment Methods:</b> CASH, VNPAY, MOMO...</p>
+     * 
+     * @param sessionId ID của session cần thanh toán
+     * @param request chứa payment method và thông tin thanh toán
+     * @return InvoiceDto chứa thông tin hóa đơn đầy đủ
+     * @throws AppException 403 nếu không phải nhân viên
+     * @throws AppException 404 nếu session không tồn tại
      */
     @Transactional
     public InvoiceDto paySession(Long sessionId, SessionRequest.PaySession request) {
@@ -441,10 +565,25 @@ public class SessionService {
         return createInvoice(session, cashier);
     }
 
-    // ==================== 7. HỦY SESSION ====================
-
     /**
-     * Hủy session.
+     * Hủy session và giải phóng tài nguyên.
+     * 
+     * <p>Method này được sử dụng khi cần hủy session do khách hủy, 
+     * lỗi hệ thống, hoặc các lý do khác. Tất cả orders sẽ bị hủy và bàn được giải phóng.</p>
+     * 
+     * <p><b>Quy trình:</b></p>
+     * <ol>
+     *   <li>Validate nhân viên có quyền hủy</li>
+     *   <li>Hủy tất cả orders (chuyển sang CANCELLED)</li>
+     *   <li>Giải phóng tất cả bàn (chuyển về AVAILABLE)</li>
+     *   <li>Hủy session (chuyển sang CANCELLED) và ghi lý do vào note</li>
+     *   <li>Gửi WebSocket notifications</li>
+     * </ol>
+     * 
+     * @param sessionId ID của session cần hủy
+     * @param request chứa lý do hủy (reason)
+     * @throws AppException 403 nếu không phải nhân viên
+     * @throws AppException 404 nếu session không tồn tại
      */
     @Transactional
     public void cancelSession(Long sessionId, SessionRequest.CancelSession request) {
@@ -480,10 +619,25 @@ public class SessionService {
         notifySessionUpdate(session);
     }
 
-    // ==================== 8. CUSTOMER ORDER (QR) ====================
-
     /**
-     * Khách đặt món qua QR - tạo pending session hoặc thêm vào session hiện có.
+     * Khách hàng đặt món qua QR code (Guest Ordering).
+     * 
+     * <p>Method này xử lý luồng đặt món từ khách không cần đăng nhập:</p>
+     * <ul>
+     *   <li><b>Bàn trống:</b> Tạo session mới với status PENDING, chờ nhân viên xác nhận</li>
+     *   <li><b>Bàn có session ACTIVE:</b> Thêm món vào session hiện tại</li>
+     *   <li><b>Bàn có session PENDING:</b> Trả lỗi, yêu cầu khách đợi nhân viên xử lý</li>
+     * </ul>
+     * 
+     * <p><b>Session Status Flow:</b></p>
+     * <pre>
+     * Khách đặt món → PENDING → Nhân viên xác nhận → ACTIVE → Khách tiếp tục order
+     * </pre>
+     * 
+     * @param request chứa tableId, danh sách món (productId, quantity), note từ khách
+     * @return CustomerOrderResponse với sessionId, status, danh sách món, tổng tiền
+     * @throws AppException 404 nếu bàn không tồn tại
+     * @throws AppException 400 nếu bàn đang PENDING hoặc RESERVED, hoặc món hết hàng
      */
     @Transactional
     public CustomerOrderResponse createCustomerOrder(CustomerOrderRequest request) {
@@ -550,7 +704,16 @@ public class SessionService {
     }
 
     /**
-     * Khách thêm món vào session đang active.
+     * Khách hàng thêm món vào session đang active.
+     * 
+     * <p>Method này được gọi khi khách muốn order thêm món sau khi session đã được xác nhận.
+     * Món mới sẽ được thêm vào order hiện tại với status PENDING.</p>
+     * 
+     * @param sessionId ID của session đang active
+     * @param request chứa danh sách món cần thêm
+     * @return CustomerOrderResponse cập nhật với danh sách món mới
+     * @throws AppException 404 nếu session không tồn tại
+     * @throws AppException 400 nếu session không ở trạng thái ACTIVE hoặc món hết hàng
      */
     @Transactional
     public CustomerOrderResponse addCustomerItems(Long sessionId, CustomerOrderRequest request) {
@@ -575,7 +738,14 @@ public class SessionService {
     }
 
     /**
-     * Khách kiểm tra trạng thái order.
+     * Khách hàng kiểm tra trạng thái order theo sessionId.
+     * 
+     * <p>Method này cho phép khách theo dõi trạng thái order realtime
+     * mà không cần WebSocket. Thường được sử dụng làm fallback khi mất kết nối.</p>
+     * 
+     * @param sessionId ID của session cần kiểm tra
+     * @return CustomerOrderResponse với status, danh sách món và trạng thái từng món
+     * @throws AppException 404 nếu session không tồn tại
      */
     public CustomerOrderResponse getCustomerOrderStatus(Long sessionId) {
         ServingSession session = sessionRepository.findByIdWithDetails(sessionId)
@@ -584,7 +754,12 @@ public class SessionService {
     }
 
     /**
-     * Lấy danh sách pending sessions (cho nhân viên).
+     * Lấy danh sách sessions đang chờ xác nhận (PENDING).
+     * 
+     * <p>Method này được nhân viên sử dụng để xem các order từ khách đang chờ xử lý.
+     * Kết quả được filter theo tenant hiện tại.</p>
+     * 
+     * @return List<SessionResponse> danh sách pending sessions
      */
     public List<SessionResponse> getPendingSessions() {
         return sessionRepository.findPendingSessions().stream()
@@ -593,7 +768,12 @@ public class SessionService {
     }
 
     /**
-     * Lấy danh sách active sessions (cho nhân viên).
+     * Lấy danh sách sessions đang hoạt động (ACTIVE).
+     * 
+     * <p>Method này được nhân viên sử dụng để xem tổng quan các bàn đang phục vụ.
+     * Kết quả được filter theo tenant hiện tại.</p>
+     * 
+     * @return List<SessionResponse> danh sách active sessions
      */
     public List<SessionResponse> getActiveSessions() {
         return sessionRepository.findActiveSessions().stream()
@@ -602,7 +782,20 @@ public class SessionService {
     }
 
     /**
-     * Nhân viên xác nhận session (PENDING → ACTIVE).
+     * Nhân viên xác nhận session từ khách (PENDING → ACTIVE).
+     * 
+     * <p>Sau khi xác nhận:</p>
+     * <ul>
+     *   <li>Session chuyển sang ACTIVE</li>
+     *   <li>Tất cả bàn chuyển sang OCCUPIED</li>
+     *   <li>Khách có thể tiếp tục order thêm món</li>
+     *   <li>Bếp bắt đầu chuẩn bị món</li>
+     * </ul>
+     * 
+     * @param sessionId ID của session cần xác nhận
+     * @return ServingSession đã được cập nhật
+     * @throws AppException 404 nếu session không tồn tại
+     * @throws AppException 400 nếu session không ở trạng thái PENDING
      */
     @Transactional
     public ServingSession confirmSession(Long sessionId) {
@@ -637,7 +830,23 @@ public class SessionService {
     }
 
     /**
-     * Nhân viên từ chối session (PENDING → CANCELLED).
+     * Nhân viên từ chối session từ khách (PENDING → CANCELLED).
+     * 
+     * <p>Sử dụng khi:</p>
+     * <ul>
+     *   <li>Món hết hàng và không thể phục vụ</li>
+     *   <li>Bàn đã được đặt trước</li>
+     *   <li>Thời gian đóng cửa</li>
+     *   <li>Các lý do khác không thể phục vụ</li>
+     * </ul>
+     * 
+     * <p>Sau khi từ chối, session sẽ bị hủy, bàn được giải phóng, 
+     * và khách sẽ nhận được thông báo kèm lý do.</p>
+     * 
+     * @param sessionId ID của session cần từ chối
+     * @param reason lý do từ chối (sẽ được hiển thị cho khách)
+     * @throws AppException 404 nếu session không tồn tại
+     * @throws AppException 400 nếu session không ở trạng thái PENDING
      */
     @Transactional
     public void rejectSession(Long sessionId, String reason) {
@@ -676,8 +885,22 @@ public class SessionService {
                 "❌ Order bàn " + session.getTableNames() + " đã bị từ chối");
     }
 
-    // ==================== PRIVATE HELPERS ====================
-
+    /**
+     * Helper method: Thêm danh sách món vào order.
+     * 
+     * <p>Method này xử lý logic chung cho cả nhân viên và khách order món:</p>
+     * <ul>
+     *   <li>Validate món còn hàng</li>
+     *   <li>Tạo OrderItem với giá snapshot</li>
+     *   <li>Cập nhật tổng tiền order</li>
+     * </ul>
+     * 
+     * @param order order cần thêm món vào
+     * @param items danh sách món cần thêm
+     * @param sourceTable bàn gốc (dùng cho trường hợp gộp bàn)
+     * @throws AppException 404 nếu sản phẩm không tồn tại
+     * @throws AppException 400 nếu món hết hàng
+     */
     private void addItemsToOrder(Order order, List<AddItemRequest> items, DiningTable sourceTable) {
         for (AddItemRequest item : items) {
             Product product = productRepository.findById(item.getProductId())
@@ -705,6 +928,21 @@ public class SessionService {
         orderRepository.save(order);
     }
 
+    /**
+     * Helper method: Xây dựng response cho khách hàng.
+     * 
+     * <p>Chuyển đổi Session entity sang CustomerOrderResponse DTO
+     * với thông tin cần thiết cho khách:</p>
+     * <ul>
+     *   <li>Trạng thái session và message thân thiện</li>
+     *   <li>Danh sách món với trạng thái từng món</li>
+     *   <li>Tổng tiền và thông tin bàn</li>
+     *   <li>Lý do từ chối (nếu có)</li>
+     * </ul>
+     * 
+     * @param session session cần chuyển đổi
+     * @return CustomerOrderResponse đầy đủ thông tin
+     */
     private CustomerOrderResponse buildCustomerOrderResponse(ServingSession session) {
         Order order = session.getPrimaryOrder();
         DiningTable table = session.getPrimaryTable();
@@ -743,6 +981,12 @@ public class SessionService {
                 .build();
     }
 
+    /**
+     * Helper method: Lấy URL ảnh đầu tiên của sản phẩm.
+     * 
+     * @param product sản phẩm cần lấy ảnh
+     * @return URL của ảnh đầu tiên, hoặc null nếu không có ảnh
+     */
     private String getProductFirstImage(Product product) {
         if (product.getImages() == null || product.getImages().isEmpty()) {
             return null;
@@ -750,6 +994,12 @@ public class SessionService {
         return product.getImages().get(0).getImageUrl();
     }
 
+    /**
+     * Helper method: Gửi cập nhật danh sách pending sessions qua WebSocket.
+     * 
+     * <p>Gửi thông báo tới topic: {@code /topic/tenant/{tenantId}/pending-sessions}</p>
+     * <p>Nhân viên subscribe topic này để nhận realtime updates về các order chờ xử lý.</p>
+     */
     private void notifyPendingSessionUpdate() {
         String tenantId = TenantContext.getTenantId();
         try {
@@ -761,8 +1011,22 @@ public class SessionService {
         }
     }
 
-    // ==================== HELPERS ====================
-
+    /**
+     * Helper method: Tạo hóa đơn từ session.
+     * 
+     * <p>Hóa đơn bao gồm:</p>
+     * <ul>
+     *   <li>Thông tin quán (tên, địa chỉ, logo)</li>
+     *   <li>Thông tin order (ID, bàn, thời gian)</li>
+     *   <li>Danh sách món và giá</li>
+     *   <li>Tổng tiền và phương thức thanh toán</li>
+     *   <li>Thông tin thu ngân</li>
+     * </ul>
+     * 
+     * @param session session đã thanh toán
+     * @param cashier nhân viên thu ngân
+     * @return InvoiceDto hóa đơn đầy đủ
+     */
     private InvoiceDto createInvoice(ServingSession session, Employee cashier) {
         String tenantId = TenantContext.getTenantId();
         var tenant = tenantRepository.findById(tenantId).orElseThrow();
@@ -796,6 +1060,19 @@ public class SessionService {
                 .build();
     }
 
+    /**
+     * Helper method: Gửi cập nhật session qua WebSocket.
+     * 
+     * <p>Gửi thông báo tới nhiều topics:</p>
+     * <ul>
+     *   <li>{@code /topic/tenant/{tenantId}/table/{tableId}} - Cập nhật cho từng bàn</li>
+     *   <li>{@code /topic/tenant/{tenantId}/session/{sessionId}} - Cập nhật cho session</li>
+     * </ul>
+     * 
+     * <p>Cả nhân viên và khách subscribe các topic này để nhận realtime updates.</p>
+     * 
+     * @param session session cần notify
+     */
     private void notifySessionUpdate(ServingSession session) {
         String tenantId = TenantContext.getTenantId();
         try {
@@ -815,7 +1092,14 @@ public class SessionService {
     }
 
     /**
-     * Notify item event (ADD, UPDATE, SERVE).
+     * Helper method: Gửi event cụ thể về OrderItem qua WebSocket.
+     * 
+     * <p>Sử dụng cho các event: ORDER_ITEM_ADDED, ORDER_ITEM_UPDATED, ORDER_ITEM_SERVED</p>
+     * <p>Event bao gồm cả item data và full session data để tránh race condition ở frontend.</p>
+     * 
+     * @param eventType loại event (ADD/UPDATE/SERVE)
+     * @param session session chứa item
+     * @param item order item được thao tác
      */
     private void notifyItemEvent(String eventType, ServingSession session, OrderItem item) {
         String tenantId = TenantContext.getTenantId();
@@ -842,7 +1126,14 @@ public class SessionService {
     }
 
     /**
-     * Notify delete event.
+     * Helper method: Gửi delete event qua WebSocket.
+     * 
+     * <p>Event chứa itemId bị xóa và tổng tiền mới của session,
+     * cùng với full session data để frontend có thể sync chính xác.</p>
+     * 
+     * @param session session chứa item bị xóa
+     * @param itemId ID của item đã xóa
+     * @param newTotal tổng tiền mới sau khi xóa
      */
     private void notifyDeleteEvent(ServingSession session, Long itemId, BigDecimal newTotal) {
         String tenantId = TenantContext.getTenantId();
@@ -864,6 +1155,12 @@ public class SessionService {
         }
     }
 
+    /**
+     * Helper method: Gửi cập nhật danh sách tất cả bàn qua WebSocket.
+     * 
+     * <p>Topic: {@code /topic/tenant/{tenantId}/tables}</p>
+     * <p>Sử dụng để cập nhật sơ đồ bàn trung tâm cho nhân viên.</p>
+     */
     private void notifyTableUpdate() {
         String tenantId = TenantContext.getTenantId();
         try {
@@ -883,6 +1180,16 @@ public class SessionService {
         }
     }
 
+    /**
+     * Helper method: Gửi thông báo chung qua WebSocket.
+     * 
+     * <p>Topic: {@code /topic/tenant/{tenantId}/notifications}</p>
+     * <p>Thông báo sẽ hiển thị trên UI của nhân viên.</p>
+     * 
+     * @param type loại thông báo (NEW_SESSION, PAYMENT_REQUEST, ...)
+     * @param table bàn liên quan
+     * @param content nội dung thông báo
+     */
     private void sendNotification(String type, DiningTable table, String content) {
         String tenantId = TenantContext.getTenantId();
         String topic = "/topic/tenant/" + tenantId + "/notifications";
@@ -898,10 +1205,14 @@ public class SessionService {
         messagingTemplate.convertAndSend(topic, msg);
     }
 
-    // ==================== CUSTOMER ACTIONS ====================
-
     /**
-     * Khách yêu cầu thanh toán.
+     * Khách hàng yêu cầu thanh toán.
+     * 
+     * <p>Gửi thông báo đến nhân viên để đến bàn xử lý thanh toán.
+     * Không thay đổi trạng thái session, chỉ tạo notification.</p>
+     * 
+     * @param sessionId ID của session cần thanh toán
+     * @throws AppException 404 nếu session không tồn tại hoặc đã kết thúc
      */
     @Transactional
     public void requestPayment(Long sessionId) {
@@ -916,7 +1227,22 @@ public class SessionService {
     }
 
     /**
-     * Xử lý khi thanh toán thành công (IPN/Callback).
+     * Xử lý callback khi thanh toán online thành công (VNPAY/MOMO).
+     * 
+     * <p>Method này được gọi từ PaymentService khi nhận được IPN/callback từ payment gateway.</p>
+     * 
+     * <p><b>Quy trình:</b></p>
+     * <ol>
+     *   <li>Cập nhật trạng thái order thành COMPLETED</li>
+     *   <li>Gửi thông báo thành công đến nhân viên</li>
+     *   <li>Khách sẽ nhận cập nhật qua WebSocket hoặc polling</li>
+     * </ol>
+     * 
+     * <p><b>Idempotent:</b> Nếu order đã COMPLETED, method sẽ return ngay mà không làm gì.</p>
+     * 
+     * @param orderId ID của order đã thanh toán
+     * @param transactionId ID giao dịch từ payment gateway
+     * @throws AppException 404 nếu order không tồn tại
      */
     @Transactional
     public void handlePaymentSuccess(Long orderId, String transactionId) {
@@ -955,6 +1281,13 @@ public class SessionService {
         orderRepository.save(order);
     }
 
+    /**
+     * Helper method: Lấy thông tin nhân viên hiện tại từ JWT token.
+     * 
+     * <p>Trích xuất userId từ JWT subject và tìm Employee tương ứng trong tenant hiện tại.</p>
+     * 
+     * @return Employee hiện tại, hoặc null nếu không có authentication hoặc không phải nhân viên
+     */
     private Employee getCurrentStaff() {
         try {
             var authentication = SecurityContextHolder.getContext().getAuthentication();

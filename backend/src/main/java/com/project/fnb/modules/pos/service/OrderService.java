@@ -19,8 +19,21 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 
 /**
- * OrderService - Chỉ giữ lại các method còn được sử dụng.
- * Các nghiệp vụ chính đã chuyển sang SessionService.
+ * Service xử lý các nghiệp vụ liên quan đến Order còn sử dụng.
+ * 
+ * <p><b>Architecture Note:</b> Đa số nghiệp vụ order đã được chuyển sang
+ * {@link SessionService} theo mô hình Session-based. OrderService chỉ giữ lại
+ * một số helper methods còn được sử dụng.</p>
+ * 
+ * <p><b>Responsibilities:</b></p>
+ * <ul>
+ *   <li>Xóa món (removeItem) - được gọi từ SessionController</li>
+ *   <li>Thông báo thanh toán thành công (notifyPaymentSuccess) - callback từ VNPay</li>
+ *   <li>WebSocket notifications cho order updates</li>
+ * </ul>
+ * 
+ * @deprecated Cân nhắc merge vào SessionService trong tương lai
+ * @see SessionService
  */
 @Service
 @RequiredArgsConstructor
@@ -32,8 +45,25 @@ public class OrderService {
     private final SimpMessagingTemplate messagingTemplate;
 
     /**
-     * Xóa món (Chỉ PENDING - Hard Delete).
-     * Được gọi từ SessionController hoặc trực tiếp.
+     * Xóa món khỏi order (hard delete).
+     * 
+     * <p><b>Business Constraint:</b> Chỉ cho phép xóa món ở trạng thái PENDING.
+     * Món đã chế biến (PREPARING) hoặc ra đồ (SERVED) không được xóa.</p>
+     * 
+     * <p><b>Price Recalculation:</b> Tự động trừ tiền món bị xóa khỏi totalAmount của Order.</p>
+     * 
+     * <p><b>WebSocket:</b> Push event qua topic {@code /topic/tenant/{tenantId}/table/{tableId}}
+     * để cập nhật UI realtime.</p>
+     * 
+     * <p><b>Use Cases:</b></p>
+     * <ul>
+     *   <li>Khách đổi ý, muốn xóa món vừa thêm</li>
+     *   <li>Nhân viên gọi nhầm món, cần xóa trước khi bếp chế biến</li>
+     * </ul>
+     * 
+     * @param itemId ID của OrderItem cần xóa
+     * @throws AppException 404 nếu item không tồn tại
+     * @throws AppException 400 nếu item không ở trạng thái PENDING
      */
     @Transactional
     public void removeItem(Long itemId) {
@@ -57,7 +87,21 @@ public class OrderService {
     }
 
     /**
-     * Notify khi thanh toán thành công (VNPay callback).
+     * Thông báo thanh toán thành công qua WebSocket sau khi VNPay callback.
+     * 
+     * <p><b>Context:</b> Method này được gọi từ VNPay payment callback handler
+     * sau khi giao dịch thành công.</p>
+     * 
+     * <p><b>WebSocket Topics:</b></p>
+     * <ul>
+     *   <li>{@code /topic/tenant/{tenantId}/table/{tableId}} - Order update cho table</li>
+     *   <li>{@code /topic/tenant/{tenantId}/notifications} - Notification cho toàn bộ staff</li>
+     * </ul>
+     * 
+     * <p><b>Notification Content:</b> "Order #{orderId} tại Bàn {tableName} đã thanh toán thành công
+     * qua VNPay ({amount})"</p>
+     * 
+     * @param order Order vừa thanh toán thành công
      */
     public void notifyPaymentSuccess(Order order) {
         String tenantId = order.getTenantId();

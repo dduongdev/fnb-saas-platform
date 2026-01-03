@@ -13,6 +13,29 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Response DTO cho Order - Được sử dụng cho WebSocket updates.
+ * 
+ * <p><b>Purpose:</b> DTO này được push qua WebSocket mỗi khi order có thay đổi
+ * (thêm món, xóa món, serve món, etc.) để cập nhật UI realtime.</p>
+ * 
+ * <p><b>WebSocket Topics:</b></p>
+ * <ul>
+ *   <li>{@code /topic/tenant/{tenantId}/table/{tableId}} - Update cho 1 bàn cụ thể</li>
+ *   <li>{@code /topic/tenant/{tenantId}/sessions} - Update cho danh sách sessions</li>
+ * </ul>
+ * 
+ * <p><b>Fields:</b></p>
+ * <ul>
+ *   <li>id: Order ID</li>
+ *   <li>tableId, tableName: Bàn gắn với order (từ session.getPrimaryTable() hoặc order.table legacy)</li>
+ *   <li>totalAmount: Tổng tiền order</li>
+ *   <li>status: Trạng thái order (ACTIVE, PAID, CANCELLED)</li>
+ *   <li>items: Danh sách món, sắp xếp theo createdAt giảm dần</li>
+ * </ul>
+ * 
+ * @see com.project.fnb.modules.pos.entity.Order
+ */
 @Data
 @Builder
 public class OrderResponse {
@@ -38,6 +61,21 @@ public class OrderResponse {
         private LocalDateTime createdAt; // Thời gian thêm món
     }
     
+    /**
+     * Convert Order entity sang OrderResponse DTO.
+     * 
+     * <p><b>Image Logic:</b> Lấy ảnh chính (isPrimary=true) của product,
+     * nếu không có thì lấy ảnh đầu tiên.</p>
+     * 
+     * <p><b>Table Logic:</b> Sử dụng {@code order.getPrimaryTable()} để lấy bàn chính
+     * từ session, fallback về order.table (legacy) nếu không có session.</p>
+     * 
+     * <p><b>Item Sorting:</b> Items được sắp xếp theo createdAt giảm dần
+     * (đặt mới nhất lên đầu).</p>
+     * 
+     * @param order Order entity cần convert
+     * @return OrderResponse DTO
+     */
     public static OrderResponse fromEntity(Order order) {
         List<ItemDto> itemDtos = order.getItems().stream()
                 // Sắp xếp item mới nhất lên đầu (Optional)

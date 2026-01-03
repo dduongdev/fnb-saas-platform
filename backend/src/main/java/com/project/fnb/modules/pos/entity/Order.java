@@ -13,6 +13,37 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
+/**
+ * Entity đại diện cho đơn hàng trong hệ thống POS.
+ * 
+ * <p><b>Session-based Model:</b> Order thuộc về Session, KHÔNG gắn trực tiếp vào Table.
+ * Điều này cho phép linh hoạt trong việc quản lý gộp bàn và phục vụ nhóm khách.</p>
+ * 
+ * <p><b>Vòng đời Order:</b></p>
+ * <pre>
+ * OPEN → WAITING_PAYMENT → COMPLETED
+ *                        → CANCELLED
+ * </pre>
+ * 
+ * <p><b>Quan hệ:</b></p>
+ * <ul>
+ *   <li>Mỗi Order thuộc 1 Session</li>
+ *   <li>Mỗi Order chứa nhiều OrderItems</li>
+ *   <li>Order được tạo bởi Employee hoặc null nếu khách tự order</li>
+ * </ul>
+ * 
+ * <p><b>Business Rules:</b></p>
+ * <ul>
+ *   <li>totalAmount được tính tự động khi thêm/xóa items</li>
+ *   <li>Chỉ OPEN order mới cho phép thêm/xóa items</li>
+ *   <li>paymentMethod chỉ được set khi thanh toán (CASH, VNPAY, MOMO...)</li>
+ * </ul>
+ * 
+ * @author FNB Team
+ * @version 1.0
+ * @see ServingSession
+ * @see OrderItem
+ */
 @Entity
 @Table(name = "orders")
 @Getter
@@ -29,7 +60,6 @@ public class Order extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Order thuộc về Session, KHÔNG thuộc trực tiếp Table
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_id")
     private ServingSession session;
@@ -44,11 +74,11 @@ public class Order extends BaseEntity {
     private OrderStatus status = OrderStatus.OPEN;
 
     @Column(name = "payment_method")
-    private String paymentMethod; // CASH, MOMO...
+    private String paymentMethod;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")
-    private Employee createdBy; // Null nếu khách tự gọi
+    private Employee createdBy;
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
@@ -57,15 +87,24 @@ public class Order extends BaseEntity {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     private Set<OrderItem> items = new HashSet<>();
 
+    /**
+     * Enum trạng thái của Order.
+     */
     public enum OrderStatus {
-        OPEN, // Đang phục vụ
-        WAITING_PAYMENT, // Chờ thanh toán
-        COMPLETED, // Đã thanh toán xong
-        CANCELLED // Hủy
+        /** Đang mở - cho phép thêm/xóa items */
+        OPEN,
+        /** Chờ thanh toán - khách đã yêu cầu thanh toán */
+        WAITING_PAYMENT,
+        /** Đã thanh toán xong */
+        COMPLETED,
+        /** Đã hủy */
+        CANCELLED
     }
 
     /**
      * Lấy bàn chính của order (từ session).
+     * 
+     * @return DiningTable chính, hoặc null nếu session không có bàn
      */
     public DiningTable getPrimaryTable() {
         return session != null ? session.getPrimaryTable() : null;

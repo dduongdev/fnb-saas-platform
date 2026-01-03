@@ -12,11 +12,41 @@ import org.springframework.data.repository.query.Param;
 import com.project.fnb.modules.pos.entity.OrderItem;
 import com.project.fnb.modules.reporting.dto.TopProductDto;
 
+/**
+ * Repository cho quản lý OrderItem entities.
+ * 
+ * <p><b>Custom Queries:</b> Chứa query để thống kê sản phẩm bán chạy (top selling products).</p>
+ * 
+ * @see OrderItem
+ */
 public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
+    
+    /**
+     * Tìm OrderItem theo ID (tenant-scoped).
+     * 
+     * <p><b>Tenant Isolation:</b> Tự động filter theo tenantId qua Hibernate filter.</p>
+     * 
+     * @param id OrderItem ID
+     * @return Optional&lt;OrderItem&gt;
+     */
     @Override
     @Query("SELECT i FROM OrderItem i WHERE i.id = :id")
     Optional<OrderItem> findById(@Param("id") Long id);
 
+    /**
+     * Thống kê top sản phẩm bán chạy trong khoảng thời gian.
+     * 
+     * <p><b>Ranking Logic:</b> Sắp xếp theo tổng số lượng bán (SUM(quantity)) giảm dần.</p>
+     * 
+     * <p><b>Filter:</b> Chỉ đếm items thuộc orders COMPLETED (bỏ qua CANCELLED).</p>
+     * 
+     * <p><b>Use Case:</b> Hiển thị top 10 món bán chạy trong báo cáo doanh thu.</p>
+     * 
+     * @param start Thời điểm bắt đầu
+     * @param end Thời điểm kết thúc
+     * @param pageable Pageable để giới hạn số kết quả (VD: top 10)
+     * @return Danh sách TopProductDto chứa (productId, productName, totalQuantity, totalRevenue)
+     */
     @Query("SELECT new com.project.fnb.modules.reporting.dto.TopProductDto(" +
             "oi.product.id, oi.product.name, SUM(oi.quantity), SUM(oi.price * oi.quantity)) " +
             "FROM OrderItem oi " +
