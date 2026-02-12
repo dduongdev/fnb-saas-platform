@@ -95,7 +95,7 @@ export function DashboardPage() {
                             <h3>Chưa có quán nào</h3>
                             <p>Bạn chưa sở hữu hoặc tham gia quản lý quán nào.</p>
                             <Button onClick={() => navigate('/my-shops')}>
-                                <Plus size={18} /> Tạo quán mới
+                                Tạo quán mới
                             </Button>
                         </Card>
                     ) : (

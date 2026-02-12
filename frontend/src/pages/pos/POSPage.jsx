@@ -21,6 +21,7 @@ import {
 } from '../../api/session';
 import { useSessionWebSocket, useSessionByIdWebSocket, usePendingSessionsWebSocket, useMultipleSessionsWebSocket } from '../../hooks/useWebSocket';
 import './POSPage.css';
+import clsx from 'clsx';
 
 export function POSPage() {
     const toast = useToast();
@@ -655,7 +656,7 @@ export function POSPage() {
                             ))}
                         </div>
 
-                        <div className="pos-products">
+                        <div className={clsx("pos-products", { "post-products--none": currentCategoryProducts.length === 0 })}>
                             {loading ? (
                                 <div className="pos-products-skeleton">
                                     {Array.from({ length: 8 }, (_, i) => (

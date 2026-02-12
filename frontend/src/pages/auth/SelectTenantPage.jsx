@@ -74,7 +74,6 @@ export function SelectTenantPage() {
                         description="Tạo quán đầu tiên để bắt đầu sử dụng hệ thống"
                         action={
                             <Button onClick={() => setShowCreateModal(true)}>
-                                <Plus size={18} />
                                 Tạo quán mới
                             </Button>
                         }
@@ -111,7 +110,6 @@ export function SelectTenantPage() {
                             onClick={() => setShowCreateModal(true)}
                             className="create-tenant-btn"
                         >
-                            <Plus size={18} />
                             Tạo quán mới
                         </Button>
                     </>

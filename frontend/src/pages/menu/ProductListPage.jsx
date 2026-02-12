@@ -213,7 +213,6 @@ export function ProductListPage() {
             title="Quản lý thực đơn"
             actions={
                 <Button onClick={handleOpenCreate}>
-                    <Plus size={18} />
                     Thêm món
                 </Button>
             }

@@ -85,8 +85,12 @@ export function SessionListPage() {
     };
 
     const handleViewSession = (session) => {
-        // Navigate to OrderSession page với role=staff
-        navigate(`/session/${session.sessionId}?role=staff`);
+        const tableId = session.tables && session.tables[0]?.id;
+        if (tableId) {
+            navigate(`/pos?table=${tableId}`);
+        } else {
+            navigate('/pos');
+        }
     };
 
     const handleConfirmSession = async (session) => {
@@ -334,7 +338,6 @@ export function SessionListPage() {
             actions={
                 <div className="session-page-actions">
                     <Button onClick={handleOpenSessionModal}>
-                        <Plus size={18} />
                         Mở phiên mới
                     </Button>
                     <Button onClick={loadSessions} variant="secondary">

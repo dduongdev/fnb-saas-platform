@@ -309,7 +309,7 @@ export function usePendingSessionsWebSocket(onPendingUpdate) {
             {
                 destination: topic,
                 callback: (data) => {
-                    console.log('[WS Pending] ✅ Received update:', data);
+                    console.log('[WS Pending] Received update:', data);
                     onPendingUpdate(data);
                 }
             }
@@ -318,8 +318,8 @@ export function usePendingSessionsWebSocket(onPendingUpdate) {
         clientRef.current = createStompClient(
             wsUrl,
             subscriptions,
-            () => console.log('[WS Pending] ✅ Subscription active for:', topic),
-            (err) => console.error('[WS Pending] ❌ Error:', err)
+            () => console.log('[WS Pending] Subscription active for:', topic),
+            (err) => console.error('[WS Pending] Error:', err)
         );
 
         return () => {
@@ -426,8 +426,8 @@ export function useMultipleSessionsWebSocket(sessionIds, onSessionUpdate, onItem
         clientRef.current = createStompClient(
             wsUrl,
             subscriptions,
-            () => console.log('[WS Multi] ✅ Subscribed to', sessionIds.length, 'sessions:', sessionIds),
-            (err) => console.error('[WS Multi] ❌ Error:', err)
+            () => console.log('[WS Multi] Subscribed to', sessionIds.length, 'sessions:', sessionIds),
+            (err) => console.error('[WS Multi] Error:', err)
         );
 
         return () => {

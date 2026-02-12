@@ -4,8 +4,6 @@ import {
     Grid,
     UtensilsCrossed,
     Layers,
-    Users,
-    Briefcase,
     BarChart3,
     Settings,
     CreditCard,
@@ -39,8 +37,6 @@ const menuItems = [
         section: 'Quản lý',
         ownerOnly: true,
         items: [
-            { path: '/staff', icon: Users, label: 'Nhân viên' },
-            { path: '/jobs', icon: Briefcase, label: 'Tuyển dụng' },
             { path: '/reports', icon: BarChart3, label: 'Báo cáo' },
         ]
     },

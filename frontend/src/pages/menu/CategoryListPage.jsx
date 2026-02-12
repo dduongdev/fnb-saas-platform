@@ -69,53 +69,38 @@ export function CategoryListPage() {
             title="Quản lý danh mục"
             actions={
                 <Button onClick={() => setShowCreateModal(true)}>
-                    <Plus size={18} />
                     Thêm danh mục
                 </Button>
             }
         >
-            {categories.length === 0 ? (
-                <Empty
-                    icon={Layers}
-                    message="Chưa có danh mục nào"
-                    description="Tạo danh mục để phân loại sản phẩm"
-                    action={
-                        <Button onClick={() => setShowCreateModal(true)}>
-                            <Plus size={18} />
-                            Thêm danh mục
-                        </Button>
-                    }
-                />
-            ) : (
-                <Card padding={false}>
-                    <table className="category-table">
-                        <thead>
-                            <tr>
-                                <th>Tên danh mục</th>
-                                <th>Hành động</th>
+            <Card padding={false}>
+                <table className="category-table">
+                    <thead>
+                        <tr>
+                            <th>Tên danh mục</th>
+                            <th>Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {categories.map(category => (
+                            <tr key={category.id}>
+                                <td className="category-name">{category.name}</td>
+                                <td>
+                                    {!category.isDefault && (
+                                        <button
+                                            className="action-btn action-btn-danger"
+                                            onClick={() => handleDelete(category)}
+                                            title="Xóa"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    )}
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            {categories.map(category => (
-                                <tr key={category.id}>
-                                    <td className="category-name">{category.name}</td>
-                                    <td>
-                                        {!category.isDefault && (
-                                            <button
-                                                className="action-btn action-btn-danger"
-                                                onClick={() => handleDelete(category)}
-                                                title="Xóa"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </Card>
-            )}
+                        ))}
+                    </tbody>
+                </table>
+            </Card>
 
             {/* Create Modal */}
             <Modal

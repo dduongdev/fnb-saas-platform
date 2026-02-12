@@ -94,7 +94,7 @@ export function MyShopsPage() {
                 </button>
                 <h1>Quán của tôi</h1>
                 <Button onClick={() => setShowCreateModal(true)}>
-                    <Plus size={18} /> Tạo quán mới
+                    Tạo quán mới
                 </Button>
             </header>
 

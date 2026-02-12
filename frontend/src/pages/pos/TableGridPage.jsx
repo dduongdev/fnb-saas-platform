@@ -97,7 +97,6 @@ export function TableGridPage() {
             title="Sơ đồ bàn"
             actions={
                 <Button onClick={() => setShowCreateModal(true)}>
-                    <Plus size={18} />
                     Thêm bàn
                 </Button>
             }
@@ -109,7 +108,6 @@ export function TableGridPage() {
                     description="Thêm bàn để bắt đầu bán hàng"
                     action={
                         <Button onClick={() => setShowCreateModal(true)}>
-                            <Plus size={18} />
                             Thêm bàn đầu tiên
                         </Button>
                     }

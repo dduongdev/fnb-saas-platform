@@ -20,25 +20,6 @@ export const PRODUCT_STATUS = {
     HIDDEN: 'HIDDEN',
 };
 
-// Employee statuses
-export const EMPLOYEE_STATUS = {
-    ACTIVE: 'ACTIVE',
-    RESIGNED: 'RESIGNED',
-};
-
-// Employee roles
-export const EMPLOYEE_ROLE = {
-    MANAGER: 'MANAGER',
-    STAFF: 'STAFF',
-};
-
-// Application statuses
-export const APPLICATION_STATUS = {
-    PENDING: 'PENDING',
-    APPROVED: 'APPROVED',
-    REJECTED: 'REJECTED',
-};
-
 // Payment methods
 export const PAYMENT_METHOD = {
     CASH: 'CASH',

@@ -10,22 +10,17 @@ import { UserProfilePage } from './pages/auth/UserProfilePage';
 import { POSPage } from './pages/pos/POSPage';
 import { TableGridPage } from './pages/pos/TableGridPage';
 import { SessionListPage } from './pages/pos/SessionListPage';
-import { OrderSessionPage } from './pages/pos/OrderSessionPage';
 import { ProductListPage } from './pages/menu/ProductListPage';
 import { CategoryListPage } from './pages/menu/CategoryListPage';
-import { StaffListPage } from './pages/hrm/StaffListPage';
 import { ReportsPage } from './pages/reports/ReportsPage';
 import { TenantSettingsPage } from './pages/settings/TenantSettingsPage';
 import { PaymentSettingsPage } from './pages/settings/PaymentSettingsPage';
-import { JobListPage } from './pages/hrm/JobListPage';
-import { ApplicationListPage } from './pages/hrm/ApplicationListPage';
 import { CustomerMenuPage } from './pages/customer/CustomerMenuPage';
 import { PublicTenantListPage } from './pages/auth/PublicTenantListPage';
 import { NotificationsPage } from './pages/notifications/NotificationsPage';
 
 import './styles/global.css';
 
-// Protected Route wrapper - Shows login page instead of auto-redirecting
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading, initialized, login } = useAuth();
 
@@ -177,16 +172,6 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/session/:sessionId"
-        element={
-          <ProtectedRoute>
-            <TenantRoute>
-              <OrderSessionPage />
-            </TenantRoute>
-          </ProtectedRoute>
-        }
-      />
 
       {/* Menu Routes */}
       <Route
@@ -205,44 +190,6 @@ function AppRoutes() {
           <ProtectedRoute>
             <TenantRoute>
               <CategoryListPage />
-            </TenantRoute>
-          </ProtectedRoute>
-        }
-      />
-
-      {/* HRM Routes (Owner Only) */}
-      <Route
-        path="/staff"
-        element={
-          <ProtectedRoute>
-            <TenantRoute>
-              <OwnerRoute>
-                <StaffListPage />
-              </OwnerRoute>
-            </TenantRoute>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/jobs"
-        element={
-          <ProtectedRoute>
-            <TenantRoute>
-              <OwnerRoute>
-                <JobListPage />
-              </OwnerRoute>
-            </TenantRoute>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/jobs/:jobId/applications"
-        element={
-          <ProtectedRoute>
-            <TenantRoute>
-              <OwnerRoute>
-                <ApplicationListPage />
-              </OwnerRoute>
             </TenantRoute>
           </ProtectedRoute>
         }
