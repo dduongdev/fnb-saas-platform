@@ -1,6 +1,5 @@
 package com.project.fnb.modules.payment.controller;
 
-import com.project.fnb.common.exception.AppException;
 import com.project.fnb.common.utils.VNPayUtils;
 import com.project.fnb.infrastructure.security.TenantContext;
 import com.project.fnb.modules.global.dto.PaymentConfigDto;
@@ -65,7 +64,7 @@ public class PaymentCallbackController {
                     String[] parts = vnp_TxnRef.split("_");
                     orderId = Long.parseLong(parts[0]);
                 } else {
-                    throw new AppException(400, "Invalid TxnRef format");
+                    return buildResponse("01", "Invalid Transaction Reference");
                 }
             } catch (NumberFormatException e) {
                 log.error("Invalid TxnRef format: {}", vnp_TxnRef);

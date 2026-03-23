@@ -1,5 +1,6 @@
 package com.project.fnb.modules.global.controller;
 
+import com.project.fnb.common.dto.ApiResponse;
 import com.project.fnb.modules.global.dto.UserResponse;
 import com.project.fnb.modules.global.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +23,7 @@ public class AuthController {
      * Nhiệm vụ: Đồng bộ User từ Token vào DB MySQL của hệ thống.
      */
     @PostMapping("/sync")
-    public UserResponse syncUser(@AuthenticationPrincipal Jwt jwt) {
-        return userService.syncUserFromToken(jwt);
+    public ApiResponse<UserResponse> syncUser(@AuthenticationPrincipal Jwt jwt) {
+        return ApiResponse.success(userService.syncUserFromToken(jwt));
     }
 }

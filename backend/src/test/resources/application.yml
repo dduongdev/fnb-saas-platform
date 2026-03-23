@@ -1,0 +1,39 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driverClassName: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: ""
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: "http://localhost:8080/realms/fnb"
+          jwk-set-uri: "http://localhost:8080/realms/fnb/protocol/openid-connect/certs"
+
+app:
+  security:
+    aes-secret: "12345678901234567890123456789012"
+  payment:
+    vnpay:
+      api-url: "http://localhost"
+      return-url: "http://localhost"
+  frontend:
+    url: "http://localhost:3000"
+
+minio:
+  url: "http://localhost:9000"
+  access-key: "minioadmin"
+  secret-key: "minioadmin"
+  external-url: "http://localhost:9000"
+  buckets:
+    public-assets: public-assets
+    user-profiles: user-profiles
+    tenant-assets: tenant-assets
