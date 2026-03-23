@@ -40,7 +40,6 @@ public class InvoiceDto {
     private String tableName;
     private LocalDateTime checkInTime;
     private LocalDateTime checkOutTime;
-    private String cashierName;
 
     private List<InvoiceItemDto> items;
     private BigDecimal totalAmount;

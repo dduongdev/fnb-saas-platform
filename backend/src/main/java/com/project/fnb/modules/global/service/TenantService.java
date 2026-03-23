@@ -1,7 +1,6 @@
 package com.project.fnb.modules.global.service;
 
 import com.project.fnb.common.exception.AppException;
-import com.project.fnb.infrastructure.security.IdentityService;
 import com.project.fnb.infrastructure.security.TenantContext;
 import com.project.fnb.infrastructure.storage.StorageService;
 import com.project.fnb.modules.global.dto.CreateTenantRequest;
@@ -11,8 +10,6 @@ import com.project.fnb.modules.global.entity.Tenant;
 import com.project.fnb.modules.global.entity.User;
 import com.project.fnb.modules.global.repository.TenantRepository;
 import com.project.fnb.modules.global.repository.UserRepository;
-import com.project.fnb.modules.hrm.entity.Employee;
-import com.project.fnb.modules.hrm.repository.EmployeeRepository;
 import com.project.fnb.modules.menu.service.CategoryService; // Inject CategoryService
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
@@ -24,7 +21,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -75,9 +71,7 @@ public class TenantService {
     private final MinioClient minioClient;
     private final CategoryService categoryService;
     private final StorageService storageService;
-    private final IdentityService identityService;
     private final UserRepository userRepository;
-    private final EmployeeRepository employeeRepository;
 
     /**
      * Tạo mới tenant (quán hàng) với bucket MinIO riêng, logo, và category mặc định.
@@ -146,10 +140,7 @@ public class TenantService {
                 .build();
         tenant = tenantRepository.save(tenant);
 
-        // B2: Tạo Group Keycloak (Để lát nữa add owner vào)
-        identityService.createTenantGroup(tenant.getId());
-
-        // B3: Tạo Bucket MinIO
+        // B2: Tạo Bucket MinIO
         String bucketName = "tenant-" + tenant.getId().toLowerCase() + "-assets";
         createBucketSafe(bucketName);
 
@@ -168,35 +159,12 @@ public class TenantService {
             // b. Tạo danh mục mặc định
             categoryService.createDefaultCategory(tenant.getId());
 
-            // c. [MỚI] Thêm Chủ quán làm Nhân viên (MANAGER)
-            addOwnerAsEmployee(ownerId);
-
         } finally {
             if (oldContext != null) TenantContext.setTenantId(oldContext);
             else TenantContext.clear();
         }
 
         return tenant;
-    }
-
-    private void addOwnerAsEmployee(String ownerId) {
-        User owner = userRepository.findById(ownerId)
-                .orElseThrow(() -> new AppException(404, "User owner not found"));
-
-        // Tạo Employee
-        Employee employee = Employee.builder()
-                .user(owner)
-                .role(Employee.Role.MANAGER) // Quyền cao nhất
-                .status(Employee.Status.ACTIVE)
-                .joinedAt(LocalDate.now())
-                .build();
-        
-        // Lưu vào DB (TenantContext đang set nên tenant_id sẽ tự động điền)
-        employeeRepository.save(employee);
-
-        // Add vào Group Keycloak
-        String tenantId = TenantContext.getTenantId();
-        identityService.addUserToGroup(ownerId, tenantId);
     }
 
     /**

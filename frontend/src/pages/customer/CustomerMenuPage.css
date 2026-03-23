@@ -598,12 +598,6 @@
     transform: scale(0.98);
 }
 
-.status-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
 .view-details-link {
     font-size: var(--text-xs);
     font-weight: var(--font-medium);

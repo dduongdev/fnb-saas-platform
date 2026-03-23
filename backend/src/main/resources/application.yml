@@ -9,6 +9,12 @@ spring:
     time-zone: Asia/Ho_Chi_Minh
     date-format: yyyy-MM-dd'T'HH:mm:ss
 
+  # File upload
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+
   # 1. Database
   datasource:
     url: ${DB_URL}
@@ -36,11 +42,6 @@ spring:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI}
           jwk-set-uri: ${KEYCLOAK_JWK_SET_URI}
-  
-keycloak:
-  admin:
-    client-id: ${KEYCLOAK_ADMIN_CLIENT_ID}
-    client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
 
 app:
   security:

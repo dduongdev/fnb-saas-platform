@@ -1,7 +1,6 @@
 package com.project.fnb.modules.pos.entity;
 
 import com.project.fnb.common.BaseEntity;
-import com.project.fnb.modules.hrm.entity.Employee;
 import com.project.fnb.modules.menu.entity.Product;
 import jakarta.persistence.*;
 import lombok.*;
@@ -74,10 +73,6 @@ public class OrderItem extends BaseEntity {
     @Column(length = 20)
     @Builder.Default
     private ItemStatus status = ItemStatus.PENDING;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by")
-    private Employee createdBy;
 
     /**
      * Enum trạng thái của OrderItem.

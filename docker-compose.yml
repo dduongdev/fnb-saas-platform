@@ -6,7 +6,6 @@ services:
   # ------------------------------------
   mysql-db:
     image: mysql:8.0
-    container_name: fnb-mysql
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: root
@@ -22,8 +21,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:23.0.0
-    container_name: fnb-keycloak
-    command: start-dev
+    command: start-dev --import-realm
     environment:
       KC_DB: dev-file
       KEYCLOAK_ADMIN: admin
@@ -33,12 +31,13 @@ services:
       KC_HTTP_RELATIVE_PATH: "/"
     ports:
       - "8080:8080"
+    volumes:
+      - ./keycloak/fnb-platform-realm.json:/opt/keycloak/data/import/fnb-platform-realm.json
     networks:
       - fnb-net
 
   minio:
     image: minio/minio:latest
-    container_name: fnb-minio
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -51,9 +50,16 @@ services:
     networks:
       - fnb-net
 
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - fnb-net
+
   rabbitmq:
     image: rabbitmq:3-management
-    container_name: fnb-rabbitmq
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -67,7 +73,6 @@ services:
   # 2. APP BACKEND SERVICE
   # ------------------------------------
   backend:
-    container_name: fnb-backend
     build:
       context: ./backend 
       dockerfile: Dockerfile

@@ -3,8 +3,6 @@ package com.project.fnb.modules.pos.service;
 import com.project.fnb.common.exception.AppException;
 import com.project.fnb.infrastructure.security.TenantContext;
 import com.project.fnb.modules.global.repository.TenantRepository;
-import com.project.fnb.modules.hrm.entity.Employee;
-import com.project.fnb.modules.hrm.repository.EmployeeRepository;
 import com.project.fnb.modules.menu.entity.Product;
 import com.project.fnb.modules.menu.repository.ProductRepository;
 import com.project.fnb.modules.pos.dto.*;
@@ -15,8 +13,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -64,7 +60,6 @@ public class SessionService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final ProductRepository productRepository;
-    private final EmployeeRepository employeeRepository;
     private final TenantRepository tenantRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final ApplicationEventPublisher eventPublisher;
@@ -100,15 +95,12 @@ public class SessionService {
                     .orElseThrow();
         }
 
-        Employee staff = getCurrentStaff();
-
         // Tạo session mới
         ServingSession session = ServingSession.builder()
                 .status(ServingSession.SessionStatus.ACTIVE)
                 .startedAt(LocalDateTime.now())
                 .guestCount(request.getGuestCount())
                 .note(request.getNote())
-                .createdBy(staff)
                 .tables(new HashSet<>())
                 .orders(new HashSet<>())
                 .build();
@@ -125,7 +117,6 @@ public class SessionService {
                 .session(session)
                 .status(Order.OrderStatus.OPEN)
                 .totalAmount(BigDecimal.ZERO)
-                .createdBy(staff)
                 .items(new HashSet<>())
                 .build();
         order = orderRepository.save(order);
@@ -195,7 +186,6 @@ public class SessionService {
             throw new AppException(400, "Session không có order");
         }
 
-        Employee staff = getCurrentStaff();
         DiningTable sourceTable = null;
         if (request.getSourceTableId() != null) {
             sourceTable = tableRepository.findById(request.getSourceTableId()).orElse(null);
@@ -217,7 +207,6 @@ public class SessionService {
                     .price(product.getPrice())
                     .note(item.getNote())
                     .status(OrderItem.ItemStatus.PENDING)
-                    .createdBy(staff)
                     .build();
             orderItem = orderItemRepository.save(orderItem);
             
@@ -525,16 +514,10 @@ public class SessionService {
      * @param sessionId ID của session cần thanh toán
      * @param request chứa payment method và thông tin thanh toán
      * @return InvoiceDto chứa thông tin hóa đơn đầy đủ
-     * @throws AppException 403 nếu không phải nhân viên
      * @throws AppException 404 nếu session không tồn tại
      */
     @Transactional
     public InvoiceDto paySession(Long sessionId, SessionRequest.PaySession request) {
-        Employee cashier = getCurrentStaff();
-        if (cashier == null) {
-            throw new AppException(403, "Chỉ nhân viên mới được thực hiện thanh toán.");
-        }
-
         ServingSession session = sessionRepository.findActiveByIdWithDetails(sessionId)
                 .orElseThrow(() -> new AppException(404, "Session không tồn tại"));
 
@@ -570,7 +553,7 @@ public class SessionService {
             eventPublisher.publishEvent(new OrderPaidEvent(primaryOrder));
         }
 
-        return createInvoice(session, cashier);
+        return createInvoice(session);
     }
 
     /**
@@ -590,16 +573,10 @@ public class SessionService {
      * 
      * @param sessionId ID của session cần hủy
      * @param request chứa lý do hủy (reason)
-     * @throws AppException 403 nếu không phải nhân viên
      * @throws AppException 404 nếu session không tồn tại
      */
     @Transactional
     public void cancelSession(Long sessionId, SessionRequest.CancelSession request) {
-        Employee staff = getCurrentStaff();
-        if (staff == null) {
-            throw new AppException(403, "Chỉ nhân viên mới có quyền hủy session.");
-        }
-
         ServingSession session = sessionRepository.findActiveByIdWithDetails(sessionId)
                 .orElseThrow(() -> new AppException(404, "Session không tồn tại"));
 
@@ -677,7 +654,6 @@ public class SessionService {
                 .status(ServingSession.SessionStatus.PENDING)
                 .startedAt(LocalDateTime.now())
                 .note(request.getCustomerNote())
-                .createdBy(null) // Customer tạo, không có employee
                 .tables(new HashSet<>())
                 .orders(new HashSet<>())
                 .build();
@@ -694,7 +670,6 @@ public class SessionService {
                 .session(session)
                 .status(Order.OrderStatus.OPEN)
                 .totalAmount(BigDecimal.ZERO)
-                .createdBy(null)
                 .items(new HashSet<>())
                 .build();
         order = orderRepository.save(order);
@@ -814,11 +789,8 @@ public class SessionService {
             throw new AppException(400, "Session này không ở trạng thái chờ xác nhận.");
         }
 
-        Employee staff = getCurrentStaff();
-
         // Chuyển session sang ACTIVE
         session.setStatus(ServingSession.SessionStatus.ACTIVE);
-        session.setCreatedBy(staff);
         sessionRepository.save(session);
 
         // Chuyển table sang OCCUPIED
@@ -926,7 +898,6 @@ public class SessionService {
                     .price(product.getPrice())
                     .note(item.getNote())
                     .status(OrderItem.ItemStatus.PENDING)
-                    .createdBy(null) // Customer order
                     .build();
             orderItem = orderItemRepository.save(orderItem);
             
@@ -1038,7 +1009,7 @@ public class SessionService {
      * @param cashier nhân viên thu ngân
      * @return InvoiceDto hóa đơn đầy đủ
      */
-    private InvoiceDto createInvoice(ServingSession session, Employee cashier) {
+    private InvoiceDto createInvoice(ServingSession session) {
         String tenantId = TenantContext.getTenantId();
         var tenant = tenantRepository.findById(tenantId).orElseThrow();
 
@@ -1064,7 +1035,6 @@ public class SessionService {
                 .tableName(session.getTableNames())
                 .checkInTime(session.getStartedAt())
                 .checkOutTime(session.getEndedAt())
-                .cashierName(cashier.getUser().getFullName())
                 .items(items)
                 .totalAmount(total)
                 .paymentMethod(order.getPaymentMethod())
@@ -1332,27 +1302,5 @@ public class SessionService {
         // messagingTemplate.convertAndSend("/topic/session/" + session.getId(), ...);
 
         orderRepository.save(order);
-    }
-
-    /**
-     * Helper method: Lấy thông tin nhân viên hiện tại từ JWT token.
-     * 
-     * <p>Trích xuất userId từ JWT subject và tìm Employee tương ứng trong tenant hiện tại.</p>
-     * 
-     * @return Employee hiện tại, hoặc null nếu không có authentication hoặc không phải nhân viên
-     */
-    private Employee getCurrentStaff() {
-        try {
-            var authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication == null || !(authentication.getPrincipal() instanceof Jwt)) {
-                return null;
-            }
-            Jwt jwt = (Jwt) authentication.getPrincipal();
-            String userId = jwt.getSubject();
-            String tenantId = TenantContext.getTenantId();
-            return employeeRepository.findByUserIdAndTenantId(userId, tenantId).orElse(null);
-        } catch (Exception e) {
-            return null;
-        }
     }
 }

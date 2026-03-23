@@ -1,7 +1,6 @@
 package com.project.fnb.modules.pos.entity;
 
 import com.project.fnb.common.BaseEntity;
-import com.project.fnb.modules.hrm.entity.Employee;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Filter;
@@ -89,10 +88,6 @@ public class ServingSession extends BaseEntity {
 
     @Column(length = 500)
     private String note;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by")
-    private Employee createdBy;
 
     // Session sở hữu nhiều Order
     // Lưu ý: KHÔNG hỗ trợ split bill - chỉ có 1 Order chính cho mỗi Session

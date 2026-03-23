@@ -116,7 +116,7 @@ export function MyShopsPage() {
                         {/* Owned Shops */}
                         {ownedShops.length > 0 && (
                             <section className="shops-section">
-                                <h2>👑 Quán tôi sở hữu ({ownedShops.length})</h2>
+                                <h2>Quán của tôi ({ownedShops.length})</h2>
                                 <div className="shops-list">
                                     {ownedShops.map(tenant => (
                                         <ShopCard 

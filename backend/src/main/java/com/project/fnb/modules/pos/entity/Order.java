@@ -1,7 +1,6 @@
 package com.project.fnb.modules.pos.entity;
 
 import com.project.fnb.common.BaseEntity;
-import com.project.fnb.modules.hrm.entity.Employee;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Filter;
@@ -29,7 +28,6 @@ import java.util.Set;
  * <ul>
  *   <li>Mỗi Order thuộc 1 Session</li>
  *   <li>Mỗi Order chứa nhiều OrderItems</li>
- *   <li>Order được tạo bởi Employee hoặc null nếu khách tự order</li>
  * </ul>
  * 
  * <p><b>Business Rules:</b></p>
@@ -75,10 +73,6 @@ public class Order extends BaseEntity {
 
     @Column(name = "payment_method")
     private String paymentMethod;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by")
-    private Employee createdBy;
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;

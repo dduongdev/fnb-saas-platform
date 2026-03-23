@@ -894,8 +894,7 @@ export function POSPage() {
                                     className="pos-btn-open-table"
                                     onClick={() => setShowOpenTableModal(true)}
                                 >
-                                    <Plus size={20} />
-                                    Mở bàn
+                                    Mở phiên
                                 </Button>
                             </div>
                         ) : (
