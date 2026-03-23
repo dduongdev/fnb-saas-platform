@@ -31,6 +31,8 @@ export function MyShopsPage() {
     const [newShopAddress, setNewShopAddress] = useState('');
     const [newShopLogo, setNewShopLogo] = useState(null);
 
+    const isWaitstaff = user?.isWaitstaff;
+
     useEffect(() => {
         loadTenants();
     }, []);
@@ -40,6 +42,12 @@ export function MyShopsPage() {
             setLoading(true);
             const data = await getMyTenants();
             setTenants(data || []);
+            
+            // Auto select if waitstaff has exactly 1 shop
+            if (isWaitstaff && data?.length === 1) {
+                await selectTenant(data[0].id);
+                navigate('/pos');
+            }
         } catch (error) {
             console.error('Failed to load tenants:', error);
         } finally {
@@ -89,13 +97,17 @@ export function MyShopsPage() {
         <div className="my-shops-page">
             {/* Header */}
             <header className="shops-header">
-                <button className="btn-back" onClick={() => navigate('/dashboard')}>
-                    <ArrowLeft size={20} />
-                </button>
+                {!isWaitstaff && (
+                    <button className="btn-back" onClick={() => navigate('/dashboard')}>
+                        <ArrowLeft size={20} />
+                    </button>
+                )}
                 <h1>Quán của tôi</h1>
-                <Button onClick={() => setShowCreateModal(true)}>
-                    Tạo quán mới
-                </Button>
+                {!isWaitstaff && (
+                    <Button onClick={() => setShowCreateModal(true)}>
+                        Tạo quán mới
+                    </Button>
+                )}
             </header>
 
             {/* Content */}
@@ -106,10 +118,12 @@ export function MyShopsPage() {
                     <div className="empty-state">
                         <Store size={64} />
                         <h2>Chưa có quán nào</h2>
-                        <p>Bạn chưa sở hữu hoặc tham gia quản lý quán nào.</p>
-                        <Button onClick={() => setShowCreateModal(true)} size="lg">
-                            <Plus size={20} /> Tạo quán đầu tiên
-                        </Button>
+                        <p>{isWaitstaff ? 'Khóa truy cập này không được liên kết với bất kỳ quán nào.' : 'Bạn chưa sở hữu hoặc tham gia quản lý quán nào.'}</p>
+                        {!isWaitstaff && (
+                            <Button onClick={() => setShowCreateModal(true)} size="lg">
+                                <Plus size={20} /> Tạo quán đầu tiên
+                            </Button>
+                        )}
                     </div>
                 ) : (
                     <>

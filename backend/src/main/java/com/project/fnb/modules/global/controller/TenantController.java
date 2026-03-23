@@ -111,9 +111,14 @@ public class TenantController {
      * @see TenantService#getMyTenants(String)
      */
     @GetMapping("/me")
-    public ApiResponse<List<Tenant>> getMyTenants(@AuthenticationPrincipal Jwt jwt) {
-        String userId = jwt.getSubject();
-        return ApiResponse.success(tenantService.getMyTenants(userId));
+    public ApiResponse<List<Tenant>> getMyTenants(org.springframework.security.core.Authentication authentication) {
+        if (authentication.getPrincipal() instanceof Jwt jwt) {
+            String userId = jwt.getSubject();
+            return ApiResponse.success(tenantService.getMyTenants(userId));
+        } else if (authentication.getPrincipal() instanceof com.project.fnb.infrastructure.security.AccessKeyUserDetails userDetails) {
+            return ApiResponse.success(java.util.List.of(tenantService.getTenantDetail(userDetails.getTenantId())));
+        }
+        throw new com.project.fnb.common.exception.AppException(401, "Unsupported authentication type");
     }
     
     /**

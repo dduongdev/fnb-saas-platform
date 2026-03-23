@@ -48,3 +48,13 @@ export const updatePaymentConfig = (id, config) =>
 // Get public tenants list
 export const getPublicTenants = (page = 0, size = 10) =>
     api.get(`/api/public/tenants?page=${page}&size=${size}`, { skipTenant: true });
+
+// --- Access Keys ---
+export const getAccessKeys = (tenantId) => 
+    api.get(`/api/tenants/${tenantId}/access-keys`);
+
+export const createAccessKey = (tenantId, data) => 
+    api.post(`/api/tenants/${tenantId}/access-keys`, data);
+
+export const revokeAccessKey = (tenantId, keyId) => 
+    api.delete(`/api/tenants/${tenantId}/access-keys/${keyId}`);

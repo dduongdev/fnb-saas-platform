@@ -7,13 +7,16 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 export async function apiRequest(endpoint, options = {}) {
   const token = localStorage.getItem('access_token');
   const tenantId = localStorage.getItem('tenant_id');
+  const accessKey = localStorage.getItem('pos_access_key');
 
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
   };
 
-  if (token) {
+  if (accessKey) {
+    headers['X-Access-Key'] = accessKey;
+  } else if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
@@ -42,10 +45,13 @@ export async function apiRequest(endpoint, options = {}) {
 export async function uploadFile(endpoint, formData, options = {}) {
   const token = localStorage.getItem('access_token');
   const tenantId = localStorage.getItem('tenant_id');
+  const accessKey = localStorage.getItem('pos_access_key');
 
   const headers = {};
 
-  if (token) {
+  if (accessKey) {
+    headers['X-Access-Key'] = accessKey;
+  } else if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 

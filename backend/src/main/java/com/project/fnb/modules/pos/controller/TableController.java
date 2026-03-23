@@ -3,6 +3,7 @@ package com.project.fnb.modules.pos.controller;
 import com.project.fnb.common.dto.ApiResponse;
 import com.project.fnb.modules.pos.dto.TableDto;
 import com.project.fnb.modules.pos.service.TableService;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -54,6 +55,7 @@ public class TableController {
      * @return ApiResponse chứa List<TableDto>
      */
     @GetMapping
+    @PreAuthorize("hasAnyRole('WAITER', 'OWNER', 'ADMIN')")
     public ApiResponse<List<TableDto>> getTables() {
         return ApiResponse.success(tableService.getTables());
     }
@@ -70,6 +72,7 @@ public class TableController {
      * @return ApiResponse chứa TableDto của bàn vừa tạo
      */
     @PostMapping
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     public ApiResponse<TableDto> createTable(@RequestParam String name) {
         return ApiResponse.success(tableService.createTable(name));
     }
@@ -86,6 +89,7 @@ public class TableController {
      * @throws AppException 404 nếu bàn không tồn tại
      */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
     public ApiResponse<String> deleteTable(@PathVariable String id) {
         tableService.deleteTable(id);
         return ApiResponse.success("Đã xóa bàn");

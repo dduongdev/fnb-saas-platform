@@ -6,6 +6,7 @@ import com.project.fnb.modules.pos.entity.ServingSession;
 import com.project.fnb.modules.pos.service.SessionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -36,6 +37,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/pos/sessions")
 @RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('WAITER', 'OWNER', 'ADMIN')")
 public class SessionController {
 
     private final SessionService sessionService;

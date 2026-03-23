@@ -5,12 +5,16 @@ import { PageLayout } from '../../components/layout';
 import { Button, Card, Loading, Empty, Modal, ModalFooter, Input, StatusBadge, ConfirmModal } from '../../components/common';
 import { getTables, createTable, deleteTable } from '../../api/pos';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import './TableGridPage.css';
 
 export function TableGridPage() {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const toast = useToast();
     const [tables, setTables] = useState([]);
+    
+    const isWaitstaff = user?.isWaitstaff;
     const [loading, setLoading] = useState(true);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [newTableName, setNewTableName] = useState('');
@@ -96,9 +100,11 @@ export function TableGridPage() {
         <PageLayout
             title="Sơ đồ bàn"
             actions={
-                <Button onClick={() => setShowCreateModal(true)}>
-                    Thêm bàn
-                </Button>
+                !isWaitstaff && (
+                    <Button onClick={() => setShowCreateModal(true)}>
+                        Thêm bàn
+                    </Button>
+                )
             }
         >
             {tables.length === 0 ? (
@@ -107,9 +113,11 @@ export function TableGridPage() {
                     message="Chưa có bàn nào"
                     description="Thêm bàn để bắt đầu bán hàng"
                     action={
-                        <Button onClick={() => setShowCreateModal(true)}>
-                            Thêm bàn đầu tiên
-                        </Button>
+                        !isWaitstaff && (
+                            <Button onClick={() => setShowCreateModal(true)}>
+                                Thêm bàn đầu tiên
+                            </Button>
+                        )
                     }
                 />
             ) : (
@@ -145,14 +153,14 @@ export function TableGridPage() {
                                 )}
 
                                 {/* Delete button for empty tables */}
-                                {!hasSession && (
+                                {!hasSession && !isWaitstaff && (
                                     <button
                                         className="table-card-delete"
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            setDeleteTableId(table.id);
+                                            handleDeleteClick(table.id);
                                         }}
-                                        title="Xóa bàn"
+                                        title="Xoá bàn"
                                     >
                                         <Trash2 size={16} />
                                     </button>

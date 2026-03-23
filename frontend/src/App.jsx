@@ -15,7 +15,9 @@ import { CategoryListPage } from './pages/menu/CategoryListPage';
 import { ReportsPage } from './pages/reports/ReportsPage';
 import { TenantSettingsPage } from './pages/settings/TenantSettingsPage';
 import { PaymentSettingsPage } from './pages/settings/PaymentSettingsPage';
+import { AccessKeySettingsPage } from './pages/settings/AccessKeySettingsPage';
 import { CustomerMenuPage } from './pages/customer/CustomerMenuPage';
+import { WaitstaffLoginPage } from './pages/auth/WaitstaffLoginPage';
 import { PublicTenantListPage } from './pages/auth/PublicTenantListPage';
 import { NotificationsPage } from './pages/notifications/NotificationsPage';
 
@@ -59,8 +61,19 @@ function ProtectedRoute({ children }) {
             cursor: 'pointer',
           }}
         >
-          Đăng nhập
+          Đăng nhập (Chủ quán)
         </button>
+        <a 
+          href="/waiter-login" 
+          style={{
+            marginTop: '16px',
+            color: 'var(--primary)',
+            textDecoration: 'underline',
+            cursor: 'pointer'
+          }}
+        >
+          Đăng nhập bằng Access Key (Nhân viên POS)
+        </a>
       </div>
     );
   }
@@ -101,6 +114,7 @@ function AppRoutes() {
       <Route path="/shops" element={<PublicTenantListPage />} />
       <Route path="/table/:tableId" element={<CustomerMenuPage />} />
       <Route path="/menu/:tenantId/:tableId" element={<CustomerMenuPage />} />
+      <Route path="/waiter-login" element={<WaitstaffLoginPage />} />
 
       {/* Dashboard Routes (Protected, No Tenant Required) */}
       <Route
@@ -215,6 +229,18 @@ function AppRoutes() {
             <TenantRoute>
               <OwnerRoute>
                 <PaymentSettingsPage />
+              </OwnerRoute>
+            </TenantRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings/access-keys"
+        element={
+          <ProtectedRoute>
+            <TenantRoute>
+              <OwnerRoute>
+                <AccessKeySettingsPage />
               </OwnerRoute>
             </TenantRoute>
           </ProtectedRoute>

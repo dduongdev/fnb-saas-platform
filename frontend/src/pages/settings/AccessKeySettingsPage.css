@@ -1,0 +1,63 @@
+.access-keys-container {
+    max-width: 800px;
+}
+
+.keys-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.key-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: white;
+}
+
+.key-item.inactive {
+    opacity: 0.6;
+    background: #f9fafb;
+}
+
+.key-info {
+    flex: 1;
+}
+
+.key-info h4 {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+}
+
+.key-meta {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.key-string-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #f3f4f6;
+    padding: 8px 12px;
+    border-radius: 6px;
+    width: fit-content;
+}
+
+.key-string-box code {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: #111827;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+}

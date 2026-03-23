@@ -113,15 +113,30 @@ export function AuthProvider({ children }) {
         }
     }, [keycloak]);
 
-    const isAuthenticated = keycloak?.authenticated ?? false;
+    const isWaitstaff = !!localStorage.getItem('pos_access_key');
+    const isAuthenticated = (keycloak?.authenticated || isWaitstaff) ?? false;
+
+    // Expand logout to handle Waitstaff
+    const handleLogout = useCallback(() => {
+        if (localStorage.getItem('pos_access_key')) {
+            localStorage.removeItem('pos_access_key');
+            window.location.href = '/waiter-login';
+        } else if (keycloak) {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('tenant_id');
+            keycloak.logout({
+                redirectUri: window.location.origin,
+            });
+        }
+    }, [keycloak]);
 
     const value = {
-        user,
+        user: user || (isWaitstaff ? { name: 'Nhân viên POS', isWaitstaff: true } : null),
         loading,
         initialized,
         isAuthenticated,
         login,
-        logout,
+        logout: handleLogout,
         keycloak,
     };
 

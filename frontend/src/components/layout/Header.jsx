@@ -49,13 +49,15 @@ export function Header({ title }) {
                     {dropdownOpen && (
                         <div className="header-dropdown">
                             <div className="header-dropdown-info">
-                                <span className="header-dropdown-name">{user?.fullName}</span>
+                                <span className="header-dropdown-name">{user?.fullName || user?.name}</span>
                                 <span className="header-dropdown-email">{user?.email}</span>
                             </div>
                             <hr className="header-dropdown-divider" />
-                            <button className="header-dropdown-item" onClick={() => window.location.href = '/profile'}>
-                                Hồ sơ cá nhân
-                            </button>
+                            {!user?.isWaitstaff && (
+                                <button className="header-dropdown-item" onClick={() => window.location.href = '/profile'}>
+                                    Hồ sơ cá nhân
+                                </button>
+                            )}
                             <button className="header-dropdown-item" onClick={logout}>
                                 Đăng xuất
                             </button>

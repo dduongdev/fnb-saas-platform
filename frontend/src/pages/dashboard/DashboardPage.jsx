@@ -27,8 +27,12 @@ export function DashboardPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (user?.isWaitstaff) {
+            navigate('/my-shops');
+            return;
+        }
         loadTenants();
-    }, []);
+    }, [user, navigate]);
 
     const loadTenants = async () => {
         try {

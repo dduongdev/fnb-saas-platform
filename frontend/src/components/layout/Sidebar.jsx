@@ -10,7 +10,8 @@ import {
     LogOut,
     Store,
     ClipboardList,
-    Bell
+    Bell,
+    AppWindow
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
@@ -28,6 +29,7 @@ const menuItems = [
     },
     {
         section: 'Thực đơn',
+        ownerOnly: true,
         items: [
             { path: '/products', icon: UtensilsCrossed, label: 'Sản phẩm' },
             { path: '/categories', icon: Layers, label: 'Danh mục' },
@@ -46,14 +48,17 @@ const menuItems = [
         items: [
             { path: '/settings', icon: Settings, label: 'Cài đặt quán' },
             { path: '/settings/payment', icon: CreditCard, label: 'Thanh toán' },
+            { path: '/settings/access-keys', icon: AppWindow, label: 'Khoá truy cập' },
         ]
     },
 ];
 
 export function Sidebar() {
     const navigate = useNavigate();
-    const { logout } = useAuth();
+    const { logout, user } = useAuth();
     const { tenant, isOwner, clearTenant } = useTenant();
+
+    const isWaitstaff = user?.isWaitstaff;
 
     const handleSwitchTenant = () => {
         clearTenant();
@@ -96,10 +101,12 @@ export function Sidebar() {
             </nav>
 
             <div className="sidebar-footer">
-                <button className="sidebar-footer-btn" onClick={handleSwitchTenant}>
-                    <Store size={18} />
-                    <span>Đổi quán</span>
-                </button>
+                {!isWaitstaff && (
+                    <button className="sidebar-footer-btn" onClick={handleSwitchTenant}>
+                        <Store size={18} />
+                        <span>Đổi quán</span>
+                    </button>
+                )}
                 <button className="sidebar-footer-btn sidebar-footer-btn-danger" onClick={logout}>
                     <LogOut size={18} />
                     <span>Đăng xuất</span>
