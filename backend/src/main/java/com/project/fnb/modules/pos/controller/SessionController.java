@@ -37,7 +37,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/pos/sessions")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('WAITER', 'OWNER', 'ADMIN')")
+// @PreAuthorize("hasAnyRole('WAITER', 'OWNER', 'ADMIN')")
 public class SessionController {
 
     private final SessionService sessionService;
@@ -56,6 +56,7 @@ public class SessionController {
      * @return ApiResponse chứa danh sách SessionResponse
      */
     @GetMapping("/pending")
+    @com.project.fnb.aspect.RequireInternal
     public ApiResponse<List<SessionResponse>> getPendingSessions() {
         List<SessionResponse> pending = sessionService.getPendingSessions();
         return ApiResponse.success(pending);
@@ -121,6 +122,7 @@ public class SessionController {
      * @throws AppException 400 nếu session không ở trạng thái PENDING
      */
     @PostMapping("/{sessionId}/reject")
+    @com.project.fnb.aspect.RequireInternal
     public ApiResponse<String> rejectSession(
             @PathVariable Long sessionId,
             @RequestBody(required = false) SessionRequest.RejectSession request) {
@@ -270,6 +272,7 @@ public class SessionController {
      * @throws AppException 409 nếu item không ở trạng thái PENDING
      */
     @PostMapping("/{sessionId}/items/{itemId}/serve")
+    @com.project.fnb.aspect.RequireInternal
     public ApiResponse<String> serveItem(
             @PathVariable Long sessionId,
             @PathVariable Long itemId) {

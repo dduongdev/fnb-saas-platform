@@ -20,6 +20,7 @@ public class AccessKeyController {
     private final AccessKeyService accessKeyService;
 
     @PostMapping
+    @com.project.fnb.aspect.RequireInternal
     public ApiResponse<AccessKeyDto> createKey(
             @PathVariable String tenantId,
             @Valid @RequestBody CreateAccessKeyRequest request,
@@ -29,6 +30,7 @@ public class AccessKeyController {
     }
 
     @GetMapping
+    @com.project.fnb.aspect.RequireInternal
     public ApiResponse<List<AccessKeyDto>> getKeys(
             @PathVariable String tenantId,
             @AuthenticationPrincipal Jwt jwt) {
@@ -37,6 +39,7 @@ public class AccessKeyController {
     }
 
     @DeleteMapping("/{keyId}")
+    @com.project.fnb.aspect.RequireInternal
     public ApiResponse<Void> revokeKey(
             @PathVariable String tenantId,
             @PathVariable String keyId,

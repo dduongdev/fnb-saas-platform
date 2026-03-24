@@ -8,6 +8,8 @@ import com.project.fnb.modules.global.dto.PaymentConfigDto;
 
 import java.time.LocalDateTime;
 
+import java.util.List;
+
 @Entity
 @Table(name = "tenants")
 @Getter
@@ -45,4 +47,10 @@ public class Tenant {
     @Column(name = "payment_config", columnDefinition = "LONGTEXT")
     @Convert(converter = PaymentConfigConverter.class) 
     private PaymentConfigDto paymentConfig;
+    
+    // Danh sách access key nội bộ thuộc tenant này
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "tenant_access_keys", joinColumns = @JoinColumn(name = "tenant_id"))
+    @Column(name = "access_key", length = 64)
+    private List<String> accessKeys;
 }

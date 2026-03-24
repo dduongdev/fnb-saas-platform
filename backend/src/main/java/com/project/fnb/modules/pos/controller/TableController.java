@@ -55,7 +55,7 @@ public class TableController {
      * @return ApiResponse chứa List<TableDto>
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('WAITER', 'OWNER', 'ADMIN')")
+    @com.project.fnb.aspect.RequireInternal
     public ApiResponse<List<TableDto>> getTables() {
         return ApiResponse.success(tableService.getTables());
     }
@@ -72,7 +72,7 @@ public class TableController {
      * @return ApiResponse chứa TableDto của bàn vừa tạo
      */
     @PostMapping
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
+    @com.project.fnb.aspect.RequireInternal
     public ApiResponse<TableDto> createTable(@RequestParam String name) {
         return ApiResponse.success(tableService.createTable(name));
     }
@@ -89,7 +89,7 @@ public class TableController {
      * @throws AppException 404 nếu bàn không tồn tại
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
+    @com.project.fnb.aspect.RequireInternal
     public ApiResponse<String> deleteTable(@PathVariable String id) {
         tableService.deleteTable(id);
         return ApiResponse.success("Đã xóa bàn");
