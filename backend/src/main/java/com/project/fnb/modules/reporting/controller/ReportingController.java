@@ -1,5 +1,7 @@
 package com.project.fnb.modules.reporting.controller;
 
+import com.project.fnb.aspect.OwnerPermissionValidator;
+import com.project.fnb.aspect.RequirePermission;
 import com.project.fnb.common.dto.ApiResponse;
 import com.project.fnb.modules.reporting.dto.HourlyStatDto;
 import com.project.fnb.modules.reporting.dto.RevenueReportDto;
@@ -18,6 +20,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/reports")
 @RequiredArgsConstructor
+@RequirePermission(OwnerPermissionValidator.class) 
 public class ReportingController {
 
     private final ReportingService reportingService;

@@ -44,6 +44,7 @@ public class NotificationController {
      * @return Page<NotificationResponse>
      */
     @GetMapping
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<Page<NotificationResponse>> getNotifications(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -57,6 +58,7 @@ public class NotificationController {
      * @return List<NotificationResponse>
      */
     @GetMapping("/unread")
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<List<NotificationResponse>> getUnreadNotifications() {
         return ApiResponse.success(notificationService.getUnreadNotifications());
     }
@@ -67,6 +69,7 @@ public class NotificationController {
      * @return Count
      */
     @GetMapping("/unread/count")
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<Long> countUnread() {
         return ApiResponse.success(notificationService.countUnread());
     }
@@ -78,6 +81,7 @@ public class NotificationController {
      * @return List<NotificationResponse>
      */
     @GetMapping("/recent")
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<List<NotificationResponse>> getRecentNotifications(
             @RequestParam(defaultValue = "10") int limit) {
         return ApiResponse.success(notificationService.getRecentNotifications(limit));
@@ -89,6 +93,7 @@ public class NotificationController {
      * @param id ID của notification
      */
     @PostMapping("/{id}/read")
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<String> markAsRead(@PathVariable Long id) {
         notificationService.markAsRead(id);
         return ApiResponse.success("Đã đánh dấu đã đọc");
@@ -98,6 +103,7 @@ public class NotificationController {
      * Đánh dấu tất cả notifications đã đọc.
      */
     @PostMapping("/read-all")
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<String> markAllAsRead() {
         notificationService.markAllAsRead();
         return ApiResponse.success("Đã đánh dấu tất cả đã đọc");

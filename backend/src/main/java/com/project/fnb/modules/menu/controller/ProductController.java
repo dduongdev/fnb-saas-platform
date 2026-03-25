@@ -1,5 +1,7 @@
 package com.project.fnb.modules.menu.controller;
 
+import com.project.fnb.aspect.OwnerPermissionValidator;
+import com.project.fnb.aspect.RequirePermission;
 import com.project.fnb.common.dto.ApiResponse;
 import com.project.fnb.modules.menu.dto.ProductResponse;
 import com.project.fnb.modules.menu.entity.Product;
@@ -43,6 +45,7 @@ public class ProductController {
     }
 
     @PostMapping(consumes = { "multipart/form-data" })
+    @RequirePermission(OwnerPermissionValidator.class)
     public ApiResponse<ProductResponse> create(
             @RequestParam Integer categoryId,
             @RequestParam String name,
@@ -54,6 +57,7 @@ public class ProductController {
     }
 
     @PutMapping("/{id}")
+    @RequirePermission(OwnerPermissionValidator.class)
     public ApiResponse<ProductResponse> updateInfo(
             @PathVariable Long id,
             @RequestParam(required = false) String name,
@@ -66,18 +70,21 @@ public class ProductController {
     }
 
     @PostMapping(value = "/{id}/images", consumes = { "multipart/form-data" })
+    @RequirePermission(OwnerPermissionValidator.class)
     public ApiResponse<String> addImages(@PathVariable Long id, @RequestParam List<MultipartFile> images) {
         productService.addImages(id, images);
         return ApiResponse.success("Đã thêm ảnh thành công");
     }
 
     @DeleteMapping("/images/{imageId}")
+    @RequirePermission(OwnerPermissionValidator.class)
     public ApiResponse<String> deleteImage(@PathVariable Long imageId) {
         productService.removeImage(imageId);
         return ApiResponse.success("Đã xóa ảnh");
     }
 
     @DeleteMapping("/{id}")
+    @RequirePermission(OwnerPermissionValidator.class)
     public ApiResponse<String> deleteProduct(@PathVariable Long id) {
         productService.deleteProduct(id);
         return ApiResponse.success("Đã xóa sản phẩm");

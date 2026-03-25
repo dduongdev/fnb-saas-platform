@@ -1,5 +1,7 @@
 package com.project.fnb.modules.menu.controller;
 
+import com.project.fnb.aspect.OwnerPermissionValidator;
+import com.project.fnb.aspect.RequirePermission;
 import com.project.fnb.common.dto.ApiResponse;
 import com.project.fnb.modules.menu.dto.CategoryDto;
 import com.project.fnb.modules.menu.entity.Category;
@@ -30,6 +32,7 @@ public class CategoryController {
     }
 
     @PostMapping
+    @RequirePermission(OwnerPermissionValidator.class)
     public ApiResponse<CategoryDto> create(@RequestParam String name, 
                                            @RequestParam(defaultValue = "1") Integer order) {
         Category c = categoryService.createCategory(name, order);
@@ -39,6 +42,7 @@ public class CategoryController {
     }
 
     @DeleteMapping("/{id}")
+    @RequirePermission(OwnerPermissionValidator.class)
     public ApiResponse<String> delete(@PathVariable Integer id) {
         categoryService.deleteCategory(id);
         return ApiResponse.success("Đã xóa danh mục thành công");

@@ -83,7 +83,7 @@ public class TenantController {
      * @see TenantService#updateTenant(String, UpdateTenantRequest, MultipartFile, String)
      */
     @PutMapping(value = "/{id}", consumes = { "multipart/form-data" })
-    @com.project.fnb.aspect.RequireInternal
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class})
     public ApiResponse<Tenant> updateTenant(
             @PathVariable String id,
             @AuthenticationPrincipal Jwt jwt,
@@ -147,7 +147,7 @@ public class TenantController {
     }
 
     @PatchMapping("/{id}/status")
-    @com.project.fnb.aspect.RequireInternal
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class})
     public ApiResponse<String> updateStatus(
             @PathVariable String id,
             @AuthenticationPrincipal Jwt jwt,
@@ -159,7 +159,7 @@ public class TenantController {
     }
 
     @PutMapping("/{id}/payment-config")
-    @com.project.fnb.aspect.RequireInternal
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class})
     public ApiResponse<String> updatePaymentConfig(
             @PathVariable String id,
             @AuthenticationPrincipal Jwt jwt,

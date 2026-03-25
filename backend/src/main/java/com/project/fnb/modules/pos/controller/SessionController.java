@@ -56,7 +56,7 @@ public class SessionController {
      * @return ApiResponse chứa danh sách SessionResponse
      */
     @GetMapping("/pending")
-    @com.project.fnb.aspect.RequireInternal
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.WaiterPermissionValidator.class, com.project.fnb.aspect.OwnerPermissionValidator.class})
     public ApiResponse<List<SessionResponse>> getPendingSessions() {
         List<SessionResponse> pending = sessionService.getPendingSessions();
         return ApiResponse.success(pending);
@@ -73,6 +73,7 @@ public class SessionController {
      * @return ApiResponse chứa danh sách SessionResponse
      */
     @GetMapping("/active")
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<List<SessionResponse>> getActiveSessions() {
         List<SessionResponse> active = sessionService.getActiveSessions();
         return ApiResponse.success(active);
@@ -97,6 +98,7 @@ public class SessionController {
      * @throws AppException 400 nếu session không ở trạng thái PENDING
      */
     @PostMapping("/{sessionId}/confirm")
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<SessionResponse> confirmSession(@PathVariable Long sessionId) {
         ServingSession session = sessionService.confirmSession(sessionId);
         return ApiResponse.success(SessionResponse.fromEntity(session));
@@ -122,7 +124,7 @@ public class SessionController {
      * @throws AppException 400 nếu session không ở trạng thái PENDING
      */
     @PostMapping("/{sessionId}/reject")
-    @com.project.fnb.aspect.RequireInternal
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<String> rejectSession(
             @PathVariable Long sessionId,
             @RequestBody(required = false) SessionRequest.RejectSession request) {
@@ -146,6 +148,7 @@ public class SessionController {
      * @throws AppException 404 nếu bàn không tồn tại
      */
     @PostMapping
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<SessionResponse> openSession(@RequestBody @Valid SessionRequest.OpenSession request) {
         ServingSession session = sessionService.openTable(request);
         return ApiResponse.success(SessionResponse.fromEntity(session));
@@ -161,6 +164,7 @@ public class SessionController {
      * @throws AppException 404 nếu session không tồn tại
      */
     @GetMapping("/{sessionId}")
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<SessionResponse> getSession(@PathVariable Long sessionId) {
         ServingSession session = sessionService.getSession(sessionId);
         return ApiResponse.success(SessionResponse.fromEntity(session));
@@ -183,6 +187,7 @@ public class SessionController {
      * @throws AppException 404 nếu bàn không tồn tại
      */
     @GetMapping("/table/{tableId}")
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<SessionResponse> getOrCreateByTable(@PathVariable String tableId) {
         ServingSession session = sessionService.getOrCreateByTable(tableId);
         return ApiResponse.success(SessionResponse.fromEntity(session));
@@ -203,6 +208,7 @@ public class SessionController {
      * @throws AppException 400 nếu session không ACTIVE hoặc món hết hàng
      */
     @PostMapping("/{sessionId}/items")
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<String> addItems(
             @PathVariable Long sessionId,
             @RequestBody @Valid SessionRequest.AddItems request) {
@@ -225,6 +231,7 @@ public class SessionController {
      * @throws AppException 409 nếu item không ở trạng thái PENDING
      */
     @DeleteMapping("/{sessionId}/items/{itemId}")
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<String> removeItem(
             @PathVariable Long sessionId,
             @PathVariable Long itemId) {
@@ -248,6 +255,7 @@ public class SessionController {
      * @throws AppException 409 nếu item không ở trạng thái PENDING
      */
     @PatchMapping("/{sessionId}/items/{itemId}")
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<String> updateItem(
             @PathVariable Long sessionId,
             @PathVariable Long itemId,
@@ -272,7 +280,7 @@ public class SessionController {
      * @throws AppException 409 nếu item không ở trạng thái PENDING
      */
     @PostMapping("/{sessionId}/items/{itemId}/serve")
-    @com.project.fnb.aspect.RequireInternal
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<String> serveItem(
             @PathVariable Long sessionId,
             @PathVariable Long itemId) {
@@ -301,6 +309,7 @@ public class SessionController {
      * @throws AppException 400 nếu session không ACTIVE hoặc bàn đang có khách
      */
     @PostMapping("/{sessionId}/tables")
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<String> attachTable(
             @PathVariable Long sessionId,
             @RequestBody @Valid SessionRequest.AttachTable request) {
@@ -360,6 +369,7 @@ public class SessionController {
      * @throws AppException 404 nếu session không tồn tại
      */
     @PostMapping("/{sessionId}/pay")
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<InvoiceDto> paySession(
             @PathVariable Long sessionId,
             @RequestBody @Valid SessionRequest.PaySession request) {
@@ -387,6 +397,7 @@ public class SessionController {
      * @throws AppException 404 nếu session không tồn tại
      */
     @PostMapping("/{sessionId}/cancel")
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<String> cancelSession(
             @PathVariable Long sessionId,
             @RequestBody(required = false) SessionRequest.CancelSession request) {

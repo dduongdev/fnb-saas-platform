@@ -20,7 +20,6 @@ public class AccessKeyController {
     private final AccessKeyService accessKeyService;
 
     @PostMapping
-    @com.project.fnb.aspect.RequireInternal
     public ApiResponse<AccessKeyDto> createKey(
             @PathVariable String tenantId,
             @Valid @RequestBody CreateAccessKeyRequest request,
@@ -30,7 +29,6 @@ public class AccessKeyController {
     }
 
     @GetMapping
-    @com.project.fnb.aspect.RequireInternal
     public ApiResponse<List<AccessKeyDto>> getKeys(
             @PathVariable String tenantId,
             @AuthenticationPrincipal Jwt jwt) {
@@ -39,14 +37,11 @@ public class AccessKeyController {
     }
 
     @GetMapping("/roles")
-    @com.project.fnb.aspect.RequireInternal
     public ApiResponse<List<String>> getRoles(@PathVariable String tenantId) {
-        // Không cần JWT kiểm tra người dùng (có thể dùng tenantId chặn nữa nếu cần sau)
         return ApiResponse.success(accessKeyService.getAccessRoles());
     }
 
     @DeleteMapping("/{keyId}")
-    @com.project.fnb.aspect.RequireInternal
     public ApiResponse<Void> revokeKey(
             @PathVariable String tenantId,
             @PathVariable String keyId,

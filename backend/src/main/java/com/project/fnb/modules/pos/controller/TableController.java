@@ -55,7 +55,7 @@ public class TableController {
      * @return ApiResponse chứa List<TableDto>
      */
     @GetMapping
-    @com.project.fnb.aspect.RequireInternal
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<List<TableDto>> getTables() {
         return ApiResponse.success(tableService.getTables());
     }
@@ -72,7 +72,7 @@ public class TableController {
      * @return ApiResponse chứa TableDto của bàn vừa tạo
      */
     @PostMapping
-    @com.project.fnb.aspect.RequireInternal
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class})
     public ApiResponse<TableDto> createTable(@RequestParam String name) {
         return ApiResponse.success(tableService.createTable(name));
     }
@@ -89,7 +89,7 @@ public class TableController {
      * @throws AppException 404 nếu bàn không tồn tại
      */
     @DeleteMapping("/{id}")
-    @com.project.fnb.aspect.RequireInternal
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class})
     public ApiResponse<String> deleteTable(@PathVariable String id) {
         tableService.deleteTable(id);
         return ApiResponse.success("Đã xóa bàn");
