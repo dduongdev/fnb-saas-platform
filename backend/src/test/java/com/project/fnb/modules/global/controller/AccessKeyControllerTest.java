@@ -106,4 +106,14 @@ public class AccessKeyControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    void getRoles_Success() throws Exception {
+        when(accessKeyService.getAccessRoles()).thenReturn(List.of("WAITER"));
+
+        mockMvc.perform(get("/api/tenants/tenant-1/access-keys/roles")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0]").value("WAITER"));
+    }
 }

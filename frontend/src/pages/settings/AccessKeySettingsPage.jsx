@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { PageLayout } from '../../components/layout';
-import { Card, Button, Input, Modal, Badge } from '../../components/common';
+import { Card, Button, Input, Modal } from '../../components/common';
 import { useTenant } from '../../context/TenantContext';
 import { useToast } from '../../context/ToastContext';
-import { getAccessKeys, createAccessKey, revokeAccessKey } from '../../api/tenant';
-import { Copy, Trash2, Key, UserCheck } from 'lucide-react';
+import { getAccessKeys, createAccessKey, revokeAccessKey, getAccessKeyRoles } from '../../api/tenant';
 import './AccessKeySettingsPage.css';
 
 export function AccessKeySettingsPage() {
@@ -14,6 +13,46 @@ export function AccessKeySettingsPage() {
     const [loading, setLoading] = useState(true);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [newName, setNewName] = useState('');
+    const [newRole, setNewRole] = useState('WAITER');
+    const [supportedRoles, setSupportedRoles] = useState([
+        { value: 'WAITER', label: 'Nhân viên phục vụ'},
+        { value: 'MANAGER', label: 'Quản lý'},
+        { value: 'OWNER', label: 'Chủ quán'},
+    ]);
+
+    useEffect(() => {
+        const loadRoles = async () => {
+            if (!tenant?.id) return;
+
+            try {
+                console.log('[AccessKey] Loading roles from backend');
+                const data = await getAccessKeyRoles(tenant.id);
+                console.log('[AccessKey] Received roles:', data);
+
+                if (data?.length > 0) {
+                    setSupportedRoles(data.map(role => ({
+                        value: role,
+                        label: role
+                            .replace('_', ' ')
+                            .toLocaleLowerCase()
+                            .replace(/^(.)/, v => v.toUpperCase())
+                    })));
+                    setNewRole(data[0]);
+                }
+            } catch (error) {
+                console.error('Lỗi khi tải role access key:', error);
+                // fallback role list giữ nguyên
+            }
+        };
+
+        const loadAll = async () => {
+            if (!tenant?.id) return;
+            await loadRoles();
+            await fetchKeys();
+        };
+
+        loadAll();
+    }, [tenant?.id]);
 
     const fetchKeys = async () => {
         try {
@@ -26,11 +65,7 @@ export function AccessKeySettingsPage() {
         }
     };
 
-    useEffect(() => {
-        if (tenant?.id) {
-            fetchKeys();
-        }
-    }, [tenant?.id]);
+
 
     const handleCreateKey = async (e) => {
         e.preventDefault();
@@ -39,7 +74,7 @@ export function AccessKeySettingsPage() {
         try {
             await createAccessKey(tenant.id, {
                 name: newName,
-                role: 'WAITER'
+                role: newRole
             });
             toast.success('Tạo khoá truy cập thành công!');
             setShowCreateModal(false);
@@ -74,10 +109,14 @@ export function AccessKeySettingsPage() {
             title="Quản lý nhân viên (Access Keys)"
             actions={
                 <Button onClick={() => setShowCreateModal(true)}>
-                    + Tạo khoá Waiter mới
+                    + Tạo khoá mới
                 </Button>
             }
         >
+            <div className="access-keys-intro">
+                <p>Quản lý khoá truy cập của nhân viên để bảo mật hệ thống POS. Bạn có thể tạo khoá mới, sao chép và thu hồi khi cần thiết.</p>
+            </div>
+
             <div className="access-keys-container">
                 <Card title="Danh sách khoá hiện tại">
                     {loading ? (
@@ -91,23 +130,22 @@ export function AccessKeySettingsPage() {
                                     <div className="key-info">
                                         <h4>{key.name}</h4>
                                         <div className="key-meta">
-                                            <Badge variant={key.isActive ? "success" : "danger"}>
+                                            <div className={`key-status ${key.isActive ? 'active' : 'inactive'}`}>
                                                 {key.isActive ? 'Đang hoạt động' : 'Đã vô hiệu hoá'}
-                                            </Badge>
-                                            <Badge variant="warning">
-                                                <UserCheck size={12} /> {key.role}
-                                            </Badge>
+                                            </div>
+                                            <div className="key-role">
+                                                {key.role}
+                                            </div>
                                         </div>
                                         <div className="key-string-box">
                                             <code>{key.keyString}</code>
                                             {key.isActive && (
                                                 <Button
-                                                    variant="secondary"
+                                                    variant="outline"
                                                     size="small"
                                                     onClick={() => handleCopy(key.keyString)}
-                                                    icon={<Copy size={16} />}
                                                 >
-                                                    Copy
+                                                    Sao chép
                                                 </Button>
                                             )}
                                         </div>
@@ -116,7 +154,6 @@ export function AccessKeySettingsPage() {
                                         {key.isActive && (
                                             <Button
                                                 variant="danger"
-                                                icon={<Trash2 size={16} />}
                                                 onClick={() => handleRevokeKey(key.id)}
                                             >
                                                 Vô hiệu hoá
@@ -144,6 +181,20 @@ export function AccessKeySettingsPage() {
                             required
                             autoFocus
                         />
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="role-select" className="input-label">Chọn role</label>
+                        <select
+                            id="role-select"
+                            value={newRole}
+                            onChange={(e) => setNewRole(e.target.value)}
+                            className="select-input"
+                        >
+                            {supportedRoles.map(role => (
+                                <option key={role.value} value={role.value}>{role.label}</option>
+                            ))}
+                        </select>
                     </div>
                     <div className="form-actions">
                         <Button type="button" variant="secondary" onClick={() => setShowCreateModal(false)}>

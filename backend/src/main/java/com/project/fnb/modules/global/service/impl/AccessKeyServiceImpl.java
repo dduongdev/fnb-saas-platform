@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -86,5 +87,12 @@ public class AccessKeyServiceImpl implements AccessKeyService {
         
         accessKey.setIsActive(false);
         accessKeyRepository.save(accessKey);
+    }
+
+    @Override
+    public List<String> getAccessRoles() {
+        return Arrays.stream(com.project.fnb.modules.global.entity.AccessRole.values())
+                .map(Enum::name)
+                .collect(Collectors.toList());
     }
 }

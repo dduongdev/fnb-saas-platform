@@ -16,66 +16,25 @@ import { ReportsPage } from './pages/reports/ReportsPage';
 import { TenantSettingsPage } from './pages/settings/TenantSettingsPage';
 import { PaymentSettingsPage } from './pages/settings/PaymentSettingsPage';
 import { AccessKeySettingsPage } from './pages/settings/AccessKeySettingsPage';
+import { MenuPage } from './pages/customer/MenuPage';
 import { CustomerMenuPage } from './pages/customer/CustomerMenuPage';
 import { WaitstaffLoginPage } from './pages/auth/WaitstaffLoginPage';
+import { LoginPage } from './pages/auth/LoginPage';
 import { PublicTenantListPage } from './pages/auth/PublicTenantListPage';
 import { NotificationsPage } from './pages/notifications/NotificationsPage';
 
 import './styles/global.css';
 
 function ProtectedRoute({ children }) {
-  const { isAuthenticated, loading, initialized, login } = useAuth();
+  const { isAuthenticated, loading, initialized } = useAuth();
 
   if (!initialized || loading) {
     return <Loading fullPage text="Đang xác thực..." />;
   }
 
   if (!isAuthenticated) {
-    // Show a login page instead of auto-redirecting
-    return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        gap: '24px',
-        backgroundColor: 'var(--bg-main)',
-      }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--text-primary)' }}>
-          F&B Management
-        </h1>
-        <p style={{ color: 'var(--text-secondary)' }}>
-          Vui lòng đăng nhập để tiếp tục
-        </p>
-        <button
-          onClick={login}
-          style={{
-            padding: '12px 32px',
-            backgroundColor: 'var(--primary)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '16px',
-            fontWeight: 500,
-            cursor: 'pointer',
-          }}
-        >
-          Đăng nhập (Chủ quán)
-        </button>
-        <a 
-          href="/waiter-login" 
-          style={{
-            marginTop: '16px',
-            color: 'var(--primary)',
-            textDecoration: 'underline',
-            cursor: 'pointer'
-          }}
-        >
-          Đăng nhập bằng Access Key (Nhân viên POS)
-        </a>
-      </div>
-    );
+    // Redirect unauthenticated users to the custom login page
+    return <Navigate to="/login" replace />;
   }
 
   return children;
@@ -113,8 +72,10 @@ function AppRoutes() {
       {/* Public Routes */}
       <Route path="/shops" element={<PublicTenantListPage />} />
       <Route path="/table/:tableId" element={<CustomerMenuPage />} />
+      <Route path="/menu/:tenantId" element={<MenuPage />} />
       <Route path="/menu/:tenantId/:tableId" element={<CustomerMenuPage />} />
       <Route path="/waiter-login" element={<WaitstaffLoginPage />} />
+      <Route path="/login" element={<LoginPage />} />
 
       {/* Dashboard Routes (Protected, No Tenant Required) */}
       <Route
@@ -261,9 +222,9 @@ function AppRoutes() {
         }
       />
 
-      {/* Default redirect - Đăng nhập xong vào Dashboard */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* Default: show login page first */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }

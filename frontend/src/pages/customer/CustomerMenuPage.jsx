@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { ShoppingCart, Minus, Plus, X, Utensils, UtensilsCrossed, Clock, CheckCircle, XCircle, RefreshCw, Trash2, CreditCard, Banknote, Wallet } from 'lucide-react';
 import { Loading, Button, Card, Empty, Input } from '../../components/common';
 import { getPublicMenu, getTableInfo } from '../../api/pos';
+import { getTenantDetail } from '../../api/tenant';
 import { createCustomerOrder, getCustomerOrderStatus, addCustomerItems, removeCustomerItem } from '../../api/session';
 import { getPublicPaymentMethods, requestPayment, createPaymentUrl } from '../../api/payment';
 import { usePublicTableWebSocket } from '../../hooks/useWebSocket';
@@ -11,8 +11,26 @@ import './CustomerMenuPage.css';
 
 console.log('[CustomerMenuPage] Component loaded, CSS should be imported');
 
+const OTHER_CATEGORY_ID = 'other';
+
+const withDefaultCategory = (categories) => {
+    const normalized = Array.isArray(categories) ? categories : [];
+    if (normalized.some(cat => cat.categoryId === OTHER_CATEGORY_ID)) {
+        return normalized;
+    }
+    return [
+        ...normalized,
+        {
+            categoryId: OTHER_CATEGORY_ID,
+            categoryName: 'Khác',
+            products: []
+        }
+    ];
+};
+
 export function CustomerMenuPage() {
     const { tableId, tenantId } = useParams();
+    const isDemoMode = !tableId || tableId === 'demo';
     const [tableInfo, setTableInfo] = useState(null);
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -25,6 +43,10 @@ export function CustomerMenuPage() {
     const [paymentMethods, setPaymentMethods] = useState([]);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [processingPayment, setProcessingPayment] = useState(false);
+
+    // Product detail modal state
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [showProductModal, setShowProductModal] = useState(false);
 
     // Order status tracking - using same structure as backend SessionResponse
     const [session, setSession] = useState(null); // Full session state from backend
@@ -237,14 +259,18 @@ export function CustomerMenuPage() {
             localStorage.setItem('tenant_id', tenantId);
         }
 
-        if (tableId) {
+        // Với scan QR bàn (/table/:tableId), phải gọi loadData() để load table + menu
+        if (tenantId || tableId) {
             loadData();
         }
 
         // Reload table info khi user quay lại trang (để check session existing)
-        const handleFocus = () => {
-            // ... existing code
+        const handleFocus = async () => {
+            if (tableId || tenantId) {
+                await loadData();
+            }
         };
+
         window.addEventListener('focus', handleFocus);
         return () => window.removeEventListener('focus', handleFocus);
     }, [tableId, tenantId]);
@@ -261,35 +287,49 @@ export function CustomerMenuPage() {
     const loadData = async () => {
         try {
             setLoading(true);
-            // 1. Get table info (includes tenantId needed for subsequent requests)
-            const info = await getTableInfo(tableId);
-            setTableInfo(info);
-            console.log('[Customer] Table info loaded:', info);
 
-            // Set tenant_id from API info if URL param missing
-            const resolvedTenantId = tenantId || info.tenantId;
-            if (resolvedTenantId) {
-                localStorage.setItem('tenant_id', resolvedTenantId);
-                // Update effectiveTenantId state for WebSocket subscription
-                setEffectiveTenantId(resolvedTenantId);
-                // Load payment methods với tenantId từ table info
-                loadPaymentMethods(resolvedTenantId);
+            let resolvedTenantId = tenantId;
+
+            if (!isDemoMode && tableId) {
+                // 1. Get table info (includes tenantId needed for subsequent requests)
+                const info = await getTableInfo(tableId);
+                setTableInfo(info);
+                console.log('[Customer] Table info loaded:', info);
+
+                // Set tenant_id from API info if URL param missing
+                resolvedTenantId = tenantId || info.tenantId;
+
+                // 2. Check if table has existing session → load it immediately
+                if (info.sessionId) {
+                    console.log('[Customer] Table has existing session:', info.sessionId);
+                    await fetchCurrentOrder(info.sessionId);
+                } else {
+                    console.log('[Customer] No existing session for this table');
+                }
+            } else if (tenantId) {
+                // Demo route (from /shops list) - no table info call
+                const tenant = await getTenantDetail(tenantId);
+                setTableInfo({
+                    tenantName: tenant.name || 'Menu quán',
+                    tableName: 'Xem menu demo',
+                });
+                console.log('[Customer] Demo mode tenant info loaded:', tenant);
+                resolvedTenantId = tenantId;
             }
 
-            // 2. Check if table has existing session → load it immediately
-            if (info.sessionId) {
-                console.log('[Customer] Table has existing session:', info.sessionId);
-                await fetchCurrentOrder(info.sessionId);
-            } else {
-                console.log('[Customer] No existing session for this table');
+            if (resolvedTenantId) {
+                localStorage.setItem('tenant_id', resolvedTenantId);
+                setEffectiveTenantId(resolvedTenantId);
+                loadPaymentMethods(resolvedTenantId);
             }
 
             // 3. Get public menu
             const menuData = await getPublicMenu();
             console.log('[Customer] Menu data loaded:', menuData);
-            setCategories(menuData || []);
-            if (menuData?.length > 0) {
-                setActiveCategory(menuData[0].categoryId);
+            const normalizedMenu = withDefaultCategory(menuData || []);
+            setCategories(normalizedMenu);
+            if (normalizedMenu.length > 0) {
+                setActiveCategory(normalizedMenu[0].categoryId);
             }
         } catch (error) {
             console.error('[Customer] Failed to load data:', error);
@@ -301,6 +341,10 @@ export function CustomerMenuPage() {
     };
 
     const reloadTableInfo = async () => {
+        if (isDemoMode) {
+            return;
+        }
+
         try {
             const info = await getTableInfo(tableId);
             setTableInfo(info);
@@ -315,7 +359,22 @@ export function CustomerMenuPage() {
         }
     };
 
+    const openProductDetail = (product) => {
+        setSelectedProduct(product);
+        setShowProductModal(true);
+    };
+
+    const closeProductDetail = () => {
+        setSelectedProduct(null);
+        setShowProductModal(false);
+    };
+
     const addToCart = (product) => {
+        if (isDemoMode) {
+            alert('Đây là chế độ xem menu demo, không thể đặt hàng.');
+            return;
+        }
+
         setCart(prev => {
             const existing = prev.find(item => item.productId === product.id);
             if (existing) {
@@ -510,9 +569,15 @@ export function CustomerMenuPage() {
             <header className="customer-header">
                 <div className="shop-info">
                     <h1>{tableInfo?.tenantName || 'Menu quán'}</h1>
-                    <p>🪑 {tableInfo?.tableName || `Bàn ${tableId}`}</p>
+                    <p>{tableInfo?.tableName || `Bàn ${tableId}`}</p>
                 </div>
             </header>
+
+            {isDemoMode && (
+                <div className="demo-banner">
+                    <p>Chế độ xem menu demo: Bạn đang xem menu mà không cần bàn/đơn.</p>
+                </div>
+            )}
 
             {/* Order Status Banner (if exists) */}
             {/* Order Status Banner (if exists) */}
@@ -524,25 +589,21 @@ export function CustomerMenuPage() {
                     <div className="status-header">
                         {session.status === 'PENDING' && (
                             <div className="status-content">
-                                <Clock size={20} className="pulse" />
                                 <span>Đơn hàng đang chờ xác nhận...</span>
                             </div>
                         )}
                         {session.status === 'ACTIVE' && (
                             <div className="status-content">
-                                <CheckCircle size={20} />
                                 <span>Đơn hàng đã được xác nhận</span>
                             </div>
                         )}
                         {session.status === 'CANCELLED' && (
                             <div className="status-content">
-                                <XCircle size={20} />
                                 <span>Đơn hàng bị từ chối</span>
                             </div>
                         )}
                         {session.status === 'COMPLETED' && (
                             <div className="status-content">
-                                <CheckCircle size={20} />
                                 <span>Đã thanh toán thành công! Cảm ơn quý khách.</span>
                             </div>
                         )}
@@ -578,13 +639,13 @@ export function CustomerMenuPage() {
 
             {/* Products Grid */}
             <main className="product-grid">
-                {categories.find(c => c.categoryId === activeCategory)?.products.map(product => (
-                    <div key={product.id} className="product-card" onClick={() => addToCart(product)}>
+                {(categories.find(c => c.categoryId === activeCategory)?.products || []).map(product => (
+                    <div key={product.id} className="product-card" onClick={() => openProductDetail(product)}>
                         <div className="product-img">
                             {product.thumbnailUrl ? (
                                 <img src={product.thumbnailUrl} alt={product.name} />
                             ) : (
-                                <div className="no-img"><Utensils /></div>
+                                <div className="no-img">No image</div>
                             )}
                         </div>
                         <div className="product-info">
@@ -594,21 +655,61 @@ export function CustomerMenuPage() {
                                 <p className="desc">{product.description}</p>
                             )}
                         </div>
-                        <button className="add-btn">
-                            <Plus size={16} />
+                        <button
+                            className="add-btn"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                addToCart(product);
+                            }}
+                        >
+                            +
                         </button>
                     </div>
                 ))}
             </main>
 
+            {/* Product Detail Modal */}
+            {showProductModal && selectedProduct && (
+                <div className="product-detail-overlay" onClick={closeProductDetail}>
+                    <div className="product-detail-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="product-detail-header">
+                            <h3>Chi tiết món</h3>
+                            <button className="close-btn" onClick={closeProductDetail}>
+                                Đóng
+                            </button>
+                        </div>
+                        <div className="product-detail-content">
+                            <div className="product-detail-img">
+                                {selectedProduct.thumbnailUrl ? (
+                                    <img src={selectedProduct.thumbnailUrl} alt={selectedProduct.name} />
+                                ) : (
+                                    <div className="no-img">No image</div>
+                                )}
+                            </div>
+                            <h4>{selectedProduct.name}</h4>
+                            <p className="detail-price">{formatPrice(selectedProduct.price)}</p>
+                            <p className="detail-desc">{selectedProduct.description || 'Không có mô tả.'}</p>
+                        </div>
+                        <div className="product-detail-actions">
+                            <Button onClick={() => { addToCart(selectedProduct); closeProductDetail(); }}>
+                                Thêm vào giỏ
+                            </Button>
+                            <Button variant="secondary" onClick={closeProductDetail}>
+                                Đóng
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Floating Action Button: Cart or Bill */}
-            {(cart.length > 0 || (session && orderItems.length > 0)) && (
+            {(cart.length > 0 || (session && orderItems.length > 0)) && !isDemoMode && (
                 <button
                     className={`cart-float-btn ${cart.length === 0 ? 'bill-mode' : ''}`}
                     onClick={() => setShowCart(true)}
                 >
                     <div className="cart-icon">
-                        {cart.length > 0 ? <ShoppingCart size={24} /> : <Utensils size={24} />}
+                        <span>{cart.length > 0 ? 'Giỏ' : 'Đơn'}</span>
                         <span className="badge">
                             {cart.length > 0 ? totalItems : orderItems.length}
                         </span>
@@ -625,9 +726,9 @@ export function CustomerMenuPage() {
                 <div className="cart-overlay">
                     <div className="cart-modal">
                         <div className="cart-header">
-                            <h3>🛒 Đơn hàng của bạn</h3>
+                            <h3>Đơn hàng của bạn</h3>
                             <button className="close-btn" onClick={() => setShowCart(false)}>
-                                <X size={24} />
+                                Đóng
                             </button>
                         </div>
 
@@ -644,11 +745,11 @@ export function CustomerMenuPage() {
                                             </div>
                                             <div className="qty-control">
                                                 <button onClick={() => updateQuantity(item.productId, -1)}>
-                                                    <Minus size={16} />
+                                                    -
                                                 </button>
                                                 <span>{item.quantity}</span>
                                                 <button onClick={() => updateQuantity(item.productId, 1)}>
-                                                    <Plus size={16} />
+                                                    +
                                                 </button>
                                             </div>
                                         </div>
@@ -673,7 +774,7 @@ export function CustomerMenuPage() {
                                                 onClick={() => handleRemoveItem(item)}
                                                 disabled={actionLoading === item.id}
                                             >
-                                                <Trash2 size={16} />
+                                                Xóa
                                             </button>
                                         </div>
                                     ))}
@@ -699,7 +800,6 @@ export function CustomerMenuPage() {
 
                             {cart.length === 0 && pendingItems.length === 0 && servedItems.length === 0 && (
                                 <div className="empty-cart-msg">
-                                    <Utensils size={48} className="text-muted" />
                                     <p>Bạn chưa gọi món nào</p>
                                 </div>
                             )}
@@ -748,7 +848,7 @@ export function CustomerMenuPage() {
                     <div className="payment-modal">
                         <h3>Chọn phương thức thanh toán</h3>
                         <button className="close-btn" onClick={() => setShowPaymentModal(false)}>
-                            <X size={24} />
+                            Đóng
                         </button>
 
                         <div className="payment-methods-list">
@@ -759,12 +859,6 @@ export function CustomerMenuPage() {
                                     onClick={() => handlePaymentSelect(method)}
                                     disabled={processingPayment}
                                 >
-                                    <div className="method-icon">
-                                        {/* Placeholder icon logic */}
-                                        {method.code === 'CASH' && <UtensilsCrossed size={24} />}
-                                        {method.code === 'VNPAY' && <CreditCard size={24} />}
-                                        {method.code === 'MOMO' && <CreditCard size={24} />}
-                                    </div>
                                     <div className="method-info">
                                         <span className="method-name">{method.name}</span>
                                         <span className="method-desc">

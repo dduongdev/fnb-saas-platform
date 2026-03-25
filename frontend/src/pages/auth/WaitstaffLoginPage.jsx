@@ -4,7 +4,7 @@ import { Shield } from 'lucide-react';
 import { getMyTenants } from '../../api/tenant';
 import { useToast } from '../../context/ToastContext';
 
-import './WaitstaffLoginPage.css';
+import '../auth/LoginPage.css';
 
 export const WaitstaffLoginPage = () => {
     const [accessKey, setAccessKey] = useState('');
@@ -42,38 +42,40 @@ export const WaitstaffLoginPage = () => {
     };
 
     return (
-        <div className="waitstaff-login-container">
-            <div className="login-card">
-                <div className="login-header">
-                    <Shield size={48} className="shield-icon" />
-                    <h2>Nhân viên điểm bán (POS)</h2>
-                    <p>Đăng nhập bằng mã Access Key được cung cấp bởi Chủ quán</p>
+        <div className="login-root">
+            <div className="login-panel">
+                <div className="login-brand">
+                    <div style={{display:'flex',alignItems:'center',gap:12}}>
+                        <div style={{width:48,height:48,display:'flex',alignItems:'center',justifyContent:'center',background:'#eef2ff',borderRadius:10}}>
+                            <Shield size={28} style={{color:'#2b3896'}} />
+                        </div>
+                        <div>
+                            <h1 style={{margin:0}}>Indigo Ledger</h1>
+                            <p style={{margin:0,fontSize:13}}>Nhân viên điểm bán (POS)</p>
+                        </div>
+                    </div>
                 </div>
 
-                <form className="login-form" onSubmit={handleLogin}>
-                    <div className="form-group">
-                        <label>Mã Access Key</label>
-                        <input
-                            type="text"
-                            placeholder="Nhập mã Access Key gồm 6-8 chữ/số..."
-                            value={accessKey}
-                            onChange={(e) => setAccessKey(e.target.value.toUpperCase())}
-                            disabled={loading}
-                        />
-                    </div>
+                <form className="login-actions" onSubmit={handleLogin}>
+                    <p>Đăng nhập bằng mã Access Key được cung cấp bởi Chủ quán</p>
 
-                    <button type="submit" className="btn btn-primary" disabled={loading || !accessKey}>
-                        {loading ? 'Đang kiểm tra...' : 'Truy cập POS'}
-                    </button>
-                    
-                    <button 
-                        type="button" 
-                        className="btn btn-secondary back-btn"
-                        onClick={() => navigate('/')}
+                    <label>Mã Access Key</label>
+                    <input
+                        type="text"
+                        placeholder="Nhập mã Access Key gồm 6-8 chữ/số..."
+                        value={accessKey}
+                        onChange={(e) => setAccessKey(e.target.value.toUpperCase())}
                         disabled={loading}
-                    >
-                        Quay lại trang chủ
-                    </button>
+                    />
+
+                    <div style={{display:'flex',gap:8}}>
+                        <button type="submit" className="btn-primary" disabled={loading || !accessKey}>
+                            {loading ? 'Đang kiểm tra...' : 'Truy cập POS'}
+                        </button>
+                        <button type="button" className="btn-secondary" onClick={() => navigate('/login')} disabled={loading}>
+                            Quay lại
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>

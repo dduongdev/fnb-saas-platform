@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+﻿import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import Keycloak from 'keycloak-js';
 import { syncUser } from '../api/auth';
 
@@ -17,10 +17,95 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
     const [initialized, setInitialized] = useState(false);
     const initRef = useRef(false);
+    const refreshTimerRef = useRef(null);
 
-    // Initialize Keycloak ONCE
+    const parseJwt = (token) => {
+        try {
+            const payload = token.split('.')[1];
+            const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+            return JSON.parse(decodeURIComponent(escape(decoded)));
+        } catch (e) {
+            return null;
+        }
+    };
+
+    const clearRefreshTimer = useCallback(() => {
+        if (refreshTimerRef.current) {
+            clearTimeout(refreshTimerRef.current);
+            refreshTimerRef.current = null;
+        }
+    }, []);
+
+    const refreshToken = async () => {
+        const storedRefreshToken = localStorage.getItem('refresh_token');
+        if (!storedRefreshToken) {
+            return;
+        }
+
+        const tokenUrl = `${keycloakConfig.url}/realms/${keycloakConfig.realm}/protocol/openid-connect/token`;
+        const params = new URLSearchParams();
+        params.append('grant_type', 'refresh_token');
+        params.append('client_id', keycloakConfig.clientId);
+        params.append('refresh_token', storedRefreshToken);
+
+        try {
+            const res = await fetch(tokenUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params.toString(),
+            });
+
+            if (!res.ok) {
+                throw new Error('refresh token failed');
+            }
+
+            const data = await res.json();
+            if (data.access_token) {
+                localStorage.setItem('access_token', data.access_token);
+                if (data.refresh_token) {
+                    localStorage.setItem('refresh_token', data.refresh_token);
+                }
+
+                const parsed = parseJwt(data.access_token);
+                setUser((prev) => ({
+                    ...prev,
+                    id: parsed?.sub,
+                    username: parsed?.preferred_username || parsed?.username,
+                    email: parsed?.email,
+                    fullName: parsed?.name,
+                }));
+
+                scheduleRefresh(data.access_token);
+            }
+        } catch (error) {
+            console.warn('Token refresh failed', error);
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            setUser(null);
+        }
+    };
+
+    const scheduleRefresh = (token) => {
+        if (!token) return;
+        const parsed = parseJwt(token);
+        if (!parsed?.exp) return;
+
+        const expiresAt = parsed.exp * 1000;
+        const refreshAt = expiresAt - 60000;
+        const delay = refreshAt - Date.now();
+
+        if (delay <= 0) {
+            refreshToken();
+            return;
+        }
+
+        clearRefreshTimer();
+        refreshTimerRef.current = setTimeout(() => {
+            refreshToken();
+        }, delay);
+    };
+
     useEffect(() => {
-        // Prevent double init in React StrictMode
         if (initRef.current) return;
         initRef.current = true;
 
@@ -28,8 +113,6 @@ export function AuthProvider({ children }) {
 
         const initKeycloak = async () => {
             try {
-                // Use check-sso: checks if user is already logged in without redirecting
-                // checkLoginIframe: false to avoid iframe issues with some browsers/configs
                 const authenticated = await kc.init({
                     onLoad: 'check-sso',
                     checkLoginIframe: false,
@@ -42,8 +125,11 @@ export function AuthProvider({ children }) {
 
                 if (authenticated && kc.token) {
                     localStorage.setItem('access_token', kc.token);
+                    if (kc.refreshToken) {
+                        localStorage.setItem('refresh_token', kc.refreshToken);
+                    }
+                    scheduleRefresh(kc.token);
 
-                    // Sync user to backend
                     try {
                         const userData = await syncUser();
                         setUser({
@@ -55,13 +141,37 @@ export function AuthProvider({ children }) {
                         });
                     } catch (error) {
                         console.error('Failed to sync user:', error);
-                        // Still set basic user info from token
                         setUser({
                             id: kc.subject,
                             username: kc.tokenParsed?.preferred_username,
                             email: kc.tokenParsed?.email,
                             fullName: kc.tokenParsed?.name,
                         });
+                    }
+                } else {
+                    const savedToken = localStorage.getItem('access_token');
+                    if (savedToken) {
+                        scheduleRefresh(savedToken);
+                        const parsed = parseJwt(savedToken);
+                        if (parsed) {
+                            try {
+                                const userData = await syncUser();
+                                setUser({
+                                    id: parsed.sub,
+                                    username: parsed.preferred_username || parsed.username,
+                                    email: parsed.email,
+                                    fullName: parsed.name,
+                                    ...userData,
+                                });
+                            } catch (err) {
+                                setUser({
+                                    id: parsed.sub,
+                                    username: parsed.preferred_username || parsed.username,
+                                    email: parsed.email,
+                                    fullName: parsed.name,
+                                });
+                            }
+                        }
                     }
                 }
 
@@ -76,7 +186,6 @@ export function AuthProvider({ children }) {
 
         initKeycloak();
 
-        // Token refresh interval
         const refreshInterval = setInterval(() => {
             if (kc?.authenticated) {
                 kc.updateToken(60).then((refreshed) => {
@@ -89,46 +198,98 @@ export function AuthProvider({ children }) {
             }
         }, 30000);
 
-        return () => clearInterval(refreshInterval);
-    }, []);
+        return () => {
+            clearInterval(refreshInterval);
+            clearRefreshTimer();
+        };
+    }, [clearRefreshTimer]);
 
-    // Login - redirects to Keycloak
     const login = useCallback(() => {
         if (keycloak) {
-            // Redirect to Keycloak login page
             keycloak.login({
-                redirectUri: window.location.origin + '/select-tenant',
+                redirectUri: window.location.origin + '/dashboard',
             });
         }
     }, [keycloak]);
 
-    // Logout
-    const logout = useCallback(() => {
-        if (keycloak) {
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('tenant_id');
-            keycloak.logout({
-                redirectUri: window.location.origin,
-            });
+    const directLogin = useCallback(async (username, password) => {
+        const tokenUrl = `${keycloakConfig.url}/realms/${keycloakConfig.realm}/protocol/openid-connect/token`;
+        const params = new URLSearchParams();
+        params.append('grant_type', 'password');
+        params.append('client_id', keycloakConfig.clientId);
+        params.append('username', username);
+        params.append('password', password);
+        params.append('scope', 'openid');
+
+        const res = await fetch(tokenUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString(),
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error_description || err.error || 'Login failed');
         }
-    }, [keycloak]);
+
+        const data = await res.json();
+        if (data.access_token) {
+            localStorage.setItem('access_token', data.access_token);
+            if (data.refresh_token) localStorage.setItem('refresh_token', data.refresh_token);
+            scheduleRefresh(data.access_token);
+
+            const parsed = parseJwt(data.access_token);
+            try {
+                const userData = await syncUser();
+                setUser({
+                    id: parsed?.sub,
+                    username: parsed?.preferred_username || parsed?.username,
+                    email: parsed?.email,
+                    fullName: parsed?.name,
+                    ...userData,
+                });
+            } catch (err) {
+                setUser({
+                    id: parsed?.sub,
+                    username: parsed?.preferred_username || parsed?.username,
+                    email: parsed?.email,
+                    fullName: parsed?.name,
+                });
+            }
+
+            setInitialized(true);
+            setLoading(false);
+
+            return data;
+        }
+
+        throw new Error('Login failed');
+    }, []);
 
     const isWaitstaff = !!localStorage.getItem('pos_access_key');
-    const isAuthenticated = (keycloak?.authenticated || isWaitstaff) ?? false;
+    const hasToken = !!localStorage.getItem('access_token');
+    const isAuthenticated = (keycloak?.authenticated || hasToken || isWaitstaff) ?? false;
 
-    // Expand logout to handle Waitstaff
     const handleLogout = useCallback(() => {
+        clearRefreshTimer();
         if (localStorage.getItem('pos_access_key')) {
             localStorage.removeItem('pos_access_key');
             window.location.href = '/waiter-login';
         } else if (keycloak) {
             localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
             localStorage.removeItem('tenant_id');
             keycloak.logout({
                 redirectUri: window.location.origin,
             });
+        } else {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('tenant_id');
+            setUser(null);
+            window.location.href = '/login';
         }
-    }, [keycloak]);
+    }, [keycloak, clearRefreshTimer]);
 
     const value = {
         user: user || (isWaitstaff ? { name: 'Nhân viên POS', isWaitstaff: true } : null),
@@ -136,6 +297,7 @@ export function AuthProvider({ children }) {
         initialized,
         isAuthenticated,
         login,
+        directLogin,
         logout: handleLogout,
         keycloak,
     };

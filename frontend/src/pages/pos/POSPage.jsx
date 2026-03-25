@@ -160,6 +160,21 @@ export function POSPage() {
         }
     };
 
+    const withDefaultCategory = (categories) => {
+        const normalized = Array.isArray(categories) ? categories : [];
+        if (normalized.some(cat => cat.categoryId === 'other')) {
+            return normalized;
+        }
+        return [
+            ...normalized,
+            {
+                categoryId: 'other',
+                categoryName: 'Khác',
+                products: []
+            }
+        ];
+    };
+
     const loadInitialData = async () => {
         try {
             const [tablesData, menuData] = await Promise.all([
@@ -167,10 +182,11 @@ export function POSPage() {
                 getPublicMenu()
             ]);
             setTables(tablesData || []);
-            setMenu(menuData || []);
+            const normalizedMenu = withDefaultCategory(menuData || []);
+            setMenu(normalizedMenu);
 
-            if (menuData && menuData.length > 0) {
-                setSelectedCategory(menuData[0].categoryId);
+            if (normalizedMenu && normalizedMenu.length > 0) {
+                setSelectedCategory(normalizedMenu[0].categoryId);
             }
 
             // Nếu có tableId từ URL params, ưu tiên dùng nó

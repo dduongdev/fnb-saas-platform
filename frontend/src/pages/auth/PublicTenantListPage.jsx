@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Store, MapPin, ArrowRight, User } from 'lucide-react';
+import { Store, MapPin, ArrowRight } from 'lucide-react';
 import { Loading, Empty, Card, Button } from '../../components/common';
 import { getPublicTenants } from '../../api/tenant';
 import { useAuth } from '../../context/AuthContext';
@@ -46,13 +46,13 @@ export function PublicTenantListPage() {
                     {isAuthenticated ? (
                         <div style={{ display: 'flex', justifyContent: 'center', gap: 16, alignItems: 'center' }}>
                             <span>Xin chào, <strong>{user?.fullName}</strong></span>
-                            <Button size="sm" onClick={() => navigate('/select-tenant')}>
-                                Vào trang quản lý
+                            <Button size="sm" onClick={() => navigate('/my-shops')}>
+                                Quản lý quán
                             </Button>
                         </div>
                     ) : (
-                        <Button variant="secondary" onClick={() => navigate('/select-tenant')}>
-                            <User size={16} /> Đăng nhập quản lý
+                        <Button variant="secondary" onClick={() => navigate('/login')}>
+                            Đăng nhập quản lý
                         </Button>
                     )}
                 </div>
@@ -70,26 +70,37 @@ export function PublicTenantListPage() {
                         <Card
                             key={shop.id}
                             className="public-shop-card"
-                            onClick={() => navigate(`/table/demo?tenant=${shop.id}`)} // Demo link since we need tableId normally
+                            onClick={() => navigate(`/menu/${shop.id}`)}
                         >
-                            <div className="shop-cover">
-                                {shop.logoUrl ? (
-                                    <img src={shop.logoUrl} alt={shop.name} className="shop-logo-large" />
-                                ) : (
-                                    <Store className="shop-placeholder-icon" />
-                                )}
-                            </div>
-                            <div className="shop-details">
-                                <h3 className="shop-name">{shop.name}</h3>
-                                <div className="shop-address">
-                                    <MapPin size={14} />
-                                    <span>{shop.address}</span>
+                            <div className="shop-row">
+                                <div className="shop-logo-wrapper">
+                                    {shop.logoUrl ? (
+                                        <img src={shop.logoUrl} alt={shop.name} className="shop-logo-small" />
+                                    ) : (
+                                        <Store className="shop-placeholder-icon" />
+                                    )}
                                 </div>
-                                <Button className="visit-btn" variant="secondary">
+                                <div className="shop-details">
+                                    <h3 className="shop-name">{shop.name}</h3>
+                                    <div className="shop-address">
+                                        <MapPin size={14} />
+                                        <span>{shop.address}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="shop-actions">
+                                <Button
+                                    className="visit-btn"
+                                    variant="secondary"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/menu/${shop.id}`);
+                                    }}
+                                >
                                     Xem Menu <ArrowRight size={16} />
                                 </Button>
-                                {/* Note: Real flow requires scanning QR at table, but here we just list shops */}
                             </div>
+                            {/* Note: Real flow requires scanning QR at table, but here we just list shops */}
                         </Card>
                     ))}
                 </div>

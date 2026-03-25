@@ -9,3 +9,8 @@ export const uploadAvatar = (file) => {
     formData.append('file', file);
     return api.upload('/api/profile/avatar', formData, { skipTenant: true });
 };
+
+// Login with Keycloak
+export const loginWithKeycloak = (username, password) => {
+    return api.post('/api/auth/login', { username, password });
+};

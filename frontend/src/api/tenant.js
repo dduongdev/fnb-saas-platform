@@ -58,3 +58,6 @@ export const createAccessKey = (tenantId, data) =>
 
 export const revokeAccessKey = (tenantId, keyId) => 
     api.delete(`/api/tenants/${tenantId}/access-keys/${keyId}`);
+
+export const getAccessKeyRoles = (tenantId) =>
+    api.get(`/api/tenants/${tenantId}/access-keys/roles`);

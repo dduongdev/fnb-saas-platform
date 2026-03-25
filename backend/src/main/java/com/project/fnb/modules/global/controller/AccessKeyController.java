@@ -38,6 +38,13 @@ public class AccessKeyController {
         return ApiResponse.success(accessKeyService.getKeysByTenant(tenantId, currentUserId));
     }
 
+    @GetMapping("/roles")
+    @com.project.fnb.aspect.RequireInternal
+    public ApiResponse<List<String>> getRoles(@PathVariable String tenantId) {
+        // Không cần JWT kiểm tra người dùng (có thể dùng tenantId chặn nữa nếu cần sau)
+        return ApiResponse.success(accessKeyService.getAccessRoles());
+    }
+
     @DeleteMapping("/{keyId}")
     @com.project.fnb.aspect.RequireInternal
     public ApiResponse<Void> revokeKey(

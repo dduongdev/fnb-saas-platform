@@ -159,13 +159,19 @@
 
 .session-card-actions {
     display: flex;
-    gap: var(--space-2);
+    gap: 2px;
     padding-top: var(--space-3);
     border-top: 1px solid var(--border);
+    flex-wrap: wrap;
 }
 
 .session-card-actions .btn {
-    flex: 1;
+    flex: 1 1 120px;
+    min-width: 110px;
+}
+
+.session-card {
+    overflow: hidden;
 }
 
 /* Skeleton */
