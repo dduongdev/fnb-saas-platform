@@ -323,8 +323,8 @@ export function CustomerMenuPage() {
                 loadPaymentMethods(resolvedTenantId);
             }
 
-            // 3. Get public menu
-            const menuData = await getPublicMenu();
+            // 3. Get public menu (tenant-specific)
+            const menuData = await getPublicMenu(resolvedTenantId);
             console.log('[Customer] Menu data loaded:', menuData);
             const normalizedMenu = withDefaultCategory(menuData || []);
             setCategories(normalizedMenu);

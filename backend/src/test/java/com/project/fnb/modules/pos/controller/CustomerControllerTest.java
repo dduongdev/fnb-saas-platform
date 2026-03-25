@@ -139,6 +139,17 @@ public class CustomerControllerTest {
     }
 
     @Test
+    void getMenu_WithTenantId_ShouldReturnList() throws Exception {
+        when(menuService.getPublicMenu()).thenReturn(new java.util.ArrayList<>());
+
+        mockMvc.perform(get("/api/pos/public/menu").param("tenantId", TENANT_ID))
+                .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        verify(menuService).getPublicMenu();
+    }
+
+    @Test
     void getTableInfo_ShouldReturnMap() throws Exception {
         DiningTable table = new DiningTable();
         table.setId("t1");

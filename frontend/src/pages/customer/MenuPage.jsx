@@ -22,7 +22,7 @@ export function MenuPage() {
                 setLoading(true);
                 const [tenantData, menuData] = await Promise.all([
                     getTenantDetail(tenantId),
-                    getPublicMenu(),
+                    getPublicMenu(tenantId),
                 ]);
 
                 setTenant(tenantData);

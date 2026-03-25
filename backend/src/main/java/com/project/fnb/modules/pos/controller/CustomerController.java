@@ -1,6 +1,7 @@
 package com.project.fnb.modules.pos.controller;
 
 import com.project.fnb.common.dto.ApiResponse;
+import com.project.fnb.infrastructure.security.TenantContext;
 import com.project.fnb.modules.global.entity.Tenant;
 import com.project.fnb.modules.global.repository.TenantRepository;
 import com.project.fnb.modules.menu.service.MenuService;
@@ -65,7 +66,20 @@ public class CustomerController {
      * @return ApiResponse chứa List<PublicMenuDto>
      */
     @GetMapping("/menu")
-    public ApiResponse<List<PublicMenuDto>> getMenu() {
+    public ApiResponse<List<PublicMenuDto>> getMenu(@RequestParam(required = false) String tenantId) {
+        if (tenantId != null && !tenantId.isBlank()) {
+            String previousTenant = TenantContext.getTenantId();
+            try {
+                TenantContext.setTenantId(tenantId);
+                return ApiResponse.success(menuService.getPublicMenu());
+            } finally {
+                if (previousTenant != null) {
+                    TenantContext.setTenantId(previousTenant);
+                } else {
+                    TenantContext.clear();
+                }
+            }
+        }
         return ApiResponse.success(menuService.getPublicMenu());
     }
 

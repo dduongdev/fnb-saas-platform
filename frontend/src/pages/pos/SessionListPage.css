@@ -159,7 +159,7 @@
 
 .session-card-actions {
     display: flex;
-    gap: 2px;
+    justify-content: space-around;
     padding-top: var(--space-3);
     border-top: 1px solid var(--border);
     flex-wrap: wrap;
