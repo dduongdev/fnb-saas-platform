@@ -22,8 +22,7 @@ public class TestJwtArgumentResolver implements HandlerMethodArgumentResolver {
 
     @Override
     public boolean supportsParameter(MethodParameter parameter) {
-        return parameter.hasParameterAnnotation(AuthenticationPrincipal.class)
-                && Jwt.class.isAssignableFrom(parameter.getParameterType());
+        return parameter.hasParameterAnnotation(AuthenticationPrincipal.class);
     }
 
     @Override
