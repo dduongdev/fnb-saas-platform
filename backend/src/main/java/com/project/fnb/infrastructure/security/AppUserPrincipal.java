@@ -1,6 +1,6 @@
 package com.project.fnb.infrastructure.security;
 
-import lombok.AllArgsConstructor;
+import com.project.fnb.modules.global.entity.User;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -8,14 +8,23 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 
 @Getter
-@AllArgsConstructor
-public class AccessKeyUserDetails implements UserDetails {
+public class AppUserPrincipal implements UserDetails {
 
-    private final String accessKeyId;
-    private final String accessKeyString; // actual key string used for login
-    private final String tenantId;
-    private final String role;
+    private final String id;
+    private final String username;
+    private final String email;
+    private final String fullName;
+    private final String password;
     private final Collection<? extends GrantedAuthority> authorities;
+
+    public AppUserPrincipal(User user, Collection<? extends GrantedAuthority> authorities) {
+        this.id = user.getId();
+        this.username = user.getUsername();
+        this.email = user.getEmail();
+        this.fullName = user.getFullName();
+        this.password = user.getPassword();
+        this.authorities = authorities;
+    }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -24,12 +33,12 @@ public class AccessKeyUserDetails implements UserDetails {
 
     @Override
     public String getPassword() {
-        return null;
+        return password;
     }
 
     @Override
     public String getUsername() {
-        return accessKeyId; // Or some identifier
+        return username;
     }
 
     @Override

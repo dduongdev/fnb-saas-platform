@@ -85,13 +85,15 @@ public class AccessKeyServiceImpl implements AccessKeyService {
             throw new AppException(400, "Khoá không thuộc Tenant này");
         }
 
-        accessKeyRepository.delete(accessKey);
+        // Vô hiệu hóa thay vì xóa vật lý
+        accessKey.setIsActive(false);
+        accessKeyRepository.save(accessKey);
     }
 
     @Override
     public List<String> getAccessRoles() {
         return Arrays.stream(com.project.fnb.modules.global.entity.AccessRole.values())
                 .map(Enum::name)
-                .collect(Collectors.toList());
+                .toList();
     }
 }

@@ -50,7 +50,9 @@ class SessionServiceTest {
     @Mock
     private NotificationService notificationService;
 
-    
+    @Mock
+    private PosActionAuditService posActionAuditService;
+
     @Mock
     private OrderItemRepository orderItemRepository;
 
@@ -263,6 +265,7 @@ class SessionServiceTest {
         
         assertEquals(3, item.getQuantity());
         verify(orderItemRepository).save(item);
+        verify(posActionAuditService).record("session.update_item_quantity", "ORDER_ITEM", "100", order.getTotalAmount(), "Cập nhật số lượng " + product.getName() + " từ 1 -> 3");
     }
 
     @Test

@@ -1,0 +1,53 @@
+.pos-audit-filters {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+/* Giữ layout button POS audit riêng biệt */
+.pos-audit-filters .btn {
+    min-width: 120px;
+    width: auto;
+    flex: 0 0 auto;
+}
+
+.audit-table-card {
+    overflow-x: auto;
+}
+
+.audit-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.audit-table th,
+.audit-table td {
+    padding: 12px 10px;
+    border: 1px solid var(--border);
+    text-align: left;
+    vertical-align: middle;
+}
+
+.audit-table th {
+    background-color: var(--bg-secondary);
+    font-weight: 600;
+}
+
+.audit-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 12px;
+}
+
+.audit-page-size {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.audit-page-size select {
+    width: 70px;
+}

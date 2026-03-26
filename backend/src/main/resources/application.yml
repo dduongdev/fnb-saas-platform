@@ -44,6 +44,9 @@ spring:
           jwk-set-uri: ${KEYCLOAK_JWK_SET_URI}
 
 app:
+  jwt:
+    secret: ${APP_JWT_SECRET:ZmFrZV9zZWNyZXRfZm9yX2RldmVsb3BtZW50X2VuY29kaW5nMTIzNA==}
+    expiration-ms: ${APP_JWT_EXPIRATION_MS:3600000}
   security:
     aes-secret: ${APP_AES_SECRET}
 

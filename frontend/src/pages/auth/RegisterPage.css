@@ -1,0 +1,50 @@
+.register-root {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: var(--bg-light);
+}
+
+.register-panel {
+    width: min(420px, 90%);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+    padding: 24px;
+}
+
+.register-panel h2 {
+    margin: 0 0 16px;
+    font-size: 22px;
+    text-align: center;
+}
+
+.register-form {
+    display: grid;
+    gap: 12px;
+}
+
+.register-form label {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.register-form input {
+    height: 40px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-light);
+}
+
+.register-error {
+    color: var(--danger);
+    font-size: 0.875rem;
+    text-align: center;
+}
+
+.btn-ghost {
+    width: 100%;
+}

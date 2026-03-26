@@ -61,3 +61,14 @@ export const revokeAccessKey = (tenantId, keyId) =>
 
 export const getAccessKeyRoles = (tenantId) =>
     api.get(`/api/tenants/${tenantId}/access-keys/roles`);
+
+export const getPosActionAudit = ({ page = 0, size = 20, action, userId, accessKeyId, targetType }) => {
+    const params = new URLSearchParams();
+    params.set('page', page);
+    params.set('size', size);
+    if (action) params.set('action', action);
+    if (userId) params.set('userId', userId);
+    if (accessKeyId) params.set('accessKeyId', accessKeyId);
+    if (targetType) params.set('targetType', targetType);
+    return api.get(`/api/pos/audit?${params.toString()}`);
+};

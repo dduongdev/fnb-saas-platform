@@ -1,13 +1,17 @@
 package com.project.fnb.modules.global.controller;
 
 import com.project.fnb.common.dto.ApiResponse;
+import com.project.fnb.common.exception.AppException;
+import com.project.fnb.modules.global.dto.LoginRequest;
+import com.project.fnb.modules.global.dto.LoginResponse;
+import com.project.fnb.modules.global.dto.RegisterUserRequest;
 import com.project.fnb.modules.global.dto.UserResponse;
+import com.project.fnb.modules.global.service.AuthService;
 import com.project.fnb.modules.global.service.UserService;
 import lombok.RequiredArgsConstructor;
 
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -17,13 +21,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final UserService userService;
+    private final AuthService authService;
 
-    /**
-     * API này được gọi sau khi Login Keycloak thành công.
-     * Nhiệm vụ: Đồng bộ User từ Token vào DB MySQL của hệ thống.
-     */
-    @PostMapping("/sync")
-    public ApiResponse<UserResponse> syncUser(@AuthenticationPrincipal Jwt jwt) {
-        return ApiResponse.success(userService.syncUserFromToken(jwt));
+    @PostMapping("/register")
+    public ApiResponse<String> registerUser(@RequestBody RegisterUserRequest request) {
+        authService.registerUser(request);
+        return ApiResponse.success("Đăng ký thành công");
+    }
+
+    @PostMapping("/login")
+    public ApiResponse<LoginResponse> login(@RequestBody LoginRequest request) {
+        return ApiResponse.success(authService.login(request));
     }
 }

@@ -1,8 +1,5 @@
 import { api } from './client';
 
-// Sync user after Keycloak login
-export const syncUser = () => api.post('/api/auth/sync', null, { skipTenant: true });
-
 // Upload avatar
 export const uploadAvatar = (file) => {
     const formData = new FormData();
@@ -10,7 +7,12 @@ export const uploadAvatar = (file) => {
     return api.upload('/api/profile/avatar', formData, { skipTenant: true });
 };
 
-// Login with Keycloak
-export const loginWithKeycloak = (username, password) => {
-    return api.post('/api/auth/login', { username, password });
+// Login with internal auth
+export const loginWithCredentials = (credentials) => {
+    return api.post('/api/auth/login', credentials, { skipTenant: true });
+};
+
+// Register new user
+export const registerUser = (payload) => {
+    return api.post('/api/auth/register', payload, { skipTenant: true });
 };

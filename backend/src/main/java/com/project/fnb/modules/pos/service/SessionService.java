@@ -61,6 +61,7 @@ public class SessionService {
     private final OrderItemRepository orderItemRepository;
     private final ProductRepository productRepository;
     private final TenantRepository tenantRepository;
+    private final PosActionAuditService auditService;
     private final SimpMessagingTemplate messagingTemplate;
     private final ApplicationEventPublisher eventPublisher;
     private final NotificationService notificationService;
@@ -84,6 +85,12 @@ public class SessionService {
      * @return ServingSession đã tạo hoặc session hiện tại nếu bàn đang active
      * @throws AppException 404 nếu bàn không tồn tại
      */
+    private void recordAction(String action, String targetType, String targetId, java.math.BigDecimal amount, String note) {
+        if (auditService != null) {
+            auditService.record(action, targetType, targetId, amount, note);
+        }
+    }
+
     @Transactional
     public ServingSession openTable(SessionRequest.OpenSession request) {
         DiningTable table = tableRepository.findById(request.getTableId())
@@ -126,6 +133,9 @@ public class SessionService {
         sendNotification("NEW_SESSION", table, "Bàn " + table.getName() + " vừa mở phiên mới");
         notifyTableUpdate();
         notifySessionUpdate(session); // Gửi đến customer đang subscribe table topic
+
+        recordAction("session.open", "SESSION", String.valueOf(session.getId()), null,
+                "Mở session cho bàn " + table.getName());
 
         return session;
     }
@@ -191,6 +201,7 @@ public class SessionService {
             sourceTable = tableRepository.findById(request.getSourceTableId()).orElse(null);
         }
 
+        List<String> addedItems = new java.util.ArrayList<>();
         for (AddItemRequest item : request.getItems()) {
             Product product = productRepository.findById(item.getProductId())
                     .orElseThrow(() -> new AppException(404, "Món không tồn tại: " + item.getProductId()));
@@ -209,13 +220,15 @@ public class SessionService {
                     .status(OrderItem.ItemStatus.PENDING)
                     .build();
             orderItem = orderItemRepository.save(orderItem);
-            
+
             // Add vào collection để SessionResponse.fromEntity có thể thấy item mới
             order.getItems().add(orderItem);
 
             BigDecimal itemTotal = product.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
             order.setTotalAmount(order.getTotalAmount().add(itemTotal));
             orderRepository.save(order);
+
+            addedItems.add(item.getQuantity() + "x " + product.getName());
 
             // Notify từng item đã thêm
             notifyItemEvent("ORDER_ITEM_ADDED", session, orderItem);
@@ -224,6 +237,9 @@ public class SessionService {
         // Notify
         sendNotification("NEW_ITEM", session.getPrimaryTable(),
                 "Bàn " + session.getTableNames() + " vừa gọi thêm món");
+
+        recordAction("session.add_item", "SESSION", String.valueOf(session.getId()), order.getTotalAmount(),
+                "Thêm " + request.getItems().size() + " món: " + String.join(", ", addedItems));
     }
 
     /**
@@ -284,6 +300,9 @@ public class SessionService {
         notifyDeleteEvent(session, itemId, order.getTotalAmount());
         sendNotification("REMOVE_ITEM", session.getPrimaryTable(),
                 "Bàn " + session.getTableNames() + " vừa xóa món");
+
+        recordAction("session.remove_item", "ORDER_ITEM", String.valueOf(itemId), order.getTotalAmount(),
+                "Xóa " + item.getQuantity() + "x " + item.getProduct().getName());
     }
 
     /**
@@ -326,6 +345,9 @@ public class SessionService {
         notifyTableUpdate();
         sendNotification("ATTACH_TABLE", session.getPrimaryTable(),
                 "Đã thêm bàn " + table.getName() + " vào session");
+
+        recordAction("session.attach_table", "TABLE", table.getId(), null,
+                "Attach table " + table.getName() + " vào session");
     }
 
     /**
@@ -382,6 +404,9 @@ public class SessionService {
         notifyTableUpdate();
         sendNotification("DETACH_TABLE", session.getPrimaryTable(),
                 "Đã tách bàn " + table.getName() + " khỏi session");
+
+        recordAction("session.detach_table", "TABLE", table.getId(), null,
+                "Detach table " + table.getName());
     }
 
     /**
@@ -432,7 +457,8 @@ public class SessionService {
         }
 
         // Tính lại tổng tiền
-        BigDecimal oldTotal = item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+        int oldQuantity = item.getQuantity();
+        BigDecimal oldTotal = item.getPrice().multiply(BigDecimal.valueOf(oldQuantity));
         BigDecimal newTotal = item.getPrice().multiply(BigDecimal.valueOf(newQuantity));
         BigDecimal diff = newTotal.subtract(oldTotal);
 
@@ -446,6 +472,10 @@ public class SessionService {
         notifyItemEvent("ORDER_ITEM_UPDATED", session, item);
         sendNotification("UPDATE_ITEM", session.getPrimaryTable(),
                 "Bàn " + session.getTableNames() + " vừa cập nhật số lượng món");
+
+        recordAction("session.update_item_quantity", "ORDER_ITEM", String.valueOf(itemId), order.getTotalAmount(),
+                "Cập nhật số lượng " + item.getProduct().getName() + " từ " + oldQuantity + " -> " + newQuantity);
+
     }
 
     /**
@@ -493,6 +523,9 @@ public class SessionService {
         notifyItemEvent("ORDER_ITEM_SERVED", session, item);
         sendNotification("SERVE_ITEM", session.getPrimaryTable(),
                 "Bàn " + session.getTableNames() + ": Đã mang ra món " + item.getProduct().getName());
+
+        recordAction("session.serve_item", "ORDER_ITEM", String.valueOf(itemId), item.getPrice().multiply(java.math.BigDecimal.valueOf(item.getQuantity())),
+                "Serve " + item.getQuantity() + "x " + item.getProduct().getName());
     }
 
     /**
@@ -553,7 +586,11 @@ public class SessionService {
             eventPublisher.publishEvent(new OrderPaidEvent(primaryOrder));
         }
 
-        return createInvoice(session);
+        var invoice = createInvoice(session);
+        recordAction("session.pay", "INVOICE", String.valueOf(invoice.getOrderId()), invoice.getTotalAmount(),
+                "Thanh toán session: " + invoice.getTotalAmount() + " bằng " + request.getMethod());
+
+        return invoice;
     }
 
     /**
@@ -602,6 +639,9 @@ public class SessionService {
 
         notifyTableUpdate();
         notifySessionUpdate(session);
+
+        recordAction("session.cancel", "SESSION", String.valueOf(session.getId()), null,
+                "Hủy session: " + (request.getReason() != null ? request.getReason() : "Không có lý do"));
     }
 
     /**
@@ -806,6 +846,9 @@ public class SessionService {
         sendNotification("SESSION_CONFIRMED", session.getPrimaryTable(),
                 "✅ Order bàn " + session.getTableNames() + " đã được xác nhận");
 
+        recordAction("session.confirm", "SESSION", String.valueOf(session.getId()), null,
+                "Xác nhận session");
+
         return session;
     }
 
@@ -863,6 +906,9 @@ public class SessionService {
         notifyPendingSessionUpdate();
         sendNotification("SESSION_REJECTED", session.getPrimaryTable(),
                 "❌ Order bàn " + session.getTableNames() + " đã bị từ chối");
+
+        recordAction("session.reject", "SESSION", String.valueOf(session.getId()), null,
+                "Từ chối session: " + (reason != null ? reason : "Không có lý do"));
     }
 
     /**

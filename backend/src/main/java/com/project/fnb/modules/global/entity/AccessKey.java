@@ -23,6 +23,10 @@ public class AccessKey {
     @Column(name = "tenant_id", nullable = false, length = 64)
     private String tenantId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id", insertable = false, updatable = false)
+    private Tenant tenant;
+
     @Column(name = "key_string", nullable = false, unique = true, length = 64)
     private String keyString;
 

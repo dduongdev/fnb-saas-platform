@@ -48,8 +48,7 @@ const menuItems = [
         items: [
             { path: '/settings', icon: Settings, label: 'Cài đặt quán' },
             { path: '/settings/payment', icon: CreditCard, label: 'Thanh toán' },
-            { path: '/settings/access-keys', icon: AppWindow, label: 'Khoá truy cập' },
-        ]
+            { path: '/settings/access-keys', icon: AppWindow, label: 'Khoá truy cập' },            { path: '/settings/audit', icon: ClipboardList, label: 'Audit POS' },        ]
     },
 ];
 

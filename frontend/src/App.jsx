@@ -16,10 +16,12 @@ import { ReportsPage } from './pages/reports/ReportsPage';
 import { TenantSettingsPage } from './pages/settings/TenantSettingsPage';
 import { PaymentSettingsPage } from './pages/settings/PaymentSettingsPage';
 import { AccessKeySettingsPage } from './pages/settings/AccessKeySettingsPage';
+import { PosAuditPage } from './pages/settings/PosAuditPage';
 import { MenuPage } from './pages/customer/MenuPage';
 import { CustomerMenuPage } from './pages/customer/CustomerMenuPage';
 import { WaitstaffLoginPage } from './pages/auth/WaitstaffLoginPage';
 import { LoginPage } from './pages/auth/LoginPage';
+import { RegisterPage } from './pages/auth/RegisterPage';
 import { PublicTenantListPage } from './pages/auth/PublicTenantListPage';
 import { NotificationsPage } from './pages/notifications/NotificationsPage';
 
@@ -76,6 +78,7 @@ function AppRoutes() {
       <Route path="/menu/:tenantId/:tableId" element={<CustomerMenuPage />} />
       <Route path="/waiter-login" element={<WaitstaffLoginPage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
 
       {/* Dashboard Routes (Protected, No Tenant Required) */}
       <Route
@@ -202,6 +205,18 @@ function AppRoutes() {
             <TenantRoute>
               <OwnerRoute>
                 <AccessKeySettingsPage />
+              </OwnerRoute>
+            </TenantRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings/audit"
+        element={
+          <ProtectedRoute>
+            <TenantRoute>
+              <OwnerRoute>
+                <PosAuditPage />
               </OwnerRoute>
             </TenantRoute>
           </ProtectedRoute>

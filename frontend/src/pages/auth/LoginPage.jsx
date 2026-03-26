@@ -73,8 +73,8 @@ export function LoginPage() {
             <button type="button" className="btn-secondary" onClick={() => navigate('/waiter-login')}>
               Đăng nhập bằng Access Key (POS)
             </button>
-            <button type="button" className="btn-ghost" onClick={() => navigate('/shops')}>
-              Xem danh sách quán
+            <button type="button" className="btn-ghost" onClick={() => navigate('/register')}>
+              Đăng ký tài khoản
             </button>
           </div>
         </form>

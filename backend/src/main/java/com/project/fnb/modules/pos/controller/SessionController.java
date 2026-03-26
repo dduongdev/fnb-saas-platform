@@ -1,5 +1,6 @@
 package com.project.fnb.modules.pos.controller;
 
+import com.project.fnb.aspect.RequirePermission;
 import com.project.fnb.common.dto.ApiResponse;
 import com.project.fnb.modules.pos.dto.*;
 import com.project.fnb.modules.pos.entity.ServingSession;
@@ -37,7 +38,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/pos/sessions")
 @RequiredArgsConstructor
-// @PreAuthorize("hasAnyRole('WAITER', 'OWNER', 'ADMIN')")
 public class SessionController {
 
     private final SessionService sessionService;
@@ -339,6 +339,7 @@ public class SessionController {
      * @throws AppException 400 nếu chỉ còn 1 bàn hoặc bàn không thuộc session
      */
     @DeleteMapping("/{sessionId}/tables/{tableId}")
+    @RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
     public ApiResponse<String> detachTable(
             @PathVariable Long sessionId,
             @PathVariable String tableId) {

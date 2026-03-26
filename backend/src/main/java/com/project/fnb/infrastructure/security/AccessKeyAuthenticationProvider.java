@@ -27,6 +27,7 @@ public class AccessKeyAuthenticationProvider implements AuthenticationProvider {
 
         AccessKeyUserDetails userDetails = new AccessKeyUserDetails(
                 accessKey.getId(),
+                keyString,
                 accessKey.getTenantId(),
                 "ROLE_" + accessKey.getRole().name(),
                 Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + accessKey.getRole().name()))
