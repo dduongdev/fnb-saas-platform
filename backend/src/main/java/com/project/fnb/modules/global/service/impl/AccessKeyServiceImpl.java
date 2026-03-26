@@ -84,9 +84,8 @@ public class AccessKeyServiceImpl implements AccessKeyService {
         if (!accessKey.getTenantId().equals(tenantId)) {
             throw new AppException(400, "Khoá không thuộc Tenant này");
         }
-        
-        accessKey.setIsActive(false);
-        accessKeyRepository.save(accessKey);
+
+        accessKeyRepository.delete(accessKey);
     }
 
     @Override

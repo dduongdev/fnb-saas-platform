@@ -105,8 +105,8 @@ public class AccessKeyServiceTest {
 
         accessKeyService.revokeKey("tenant-1", "key-1", "user-1");
 
-        assertFalse(accessKey.getIsActive());
-        verify(accessKeyRepository, times(1)).save(accessKey);
+        verify(accessKeyRepository, times(1)).delete(accessKey);
+        verify(accessKeyRepository, never()).save(any(AccessKey.class));
     }
 
     @Test

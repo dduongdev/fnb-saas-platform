@@ -14,11 +14,7 @@ export function AccessKeySettingsPage() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [newName, setNewName] = useState('');
     const [newRole, setNewRole] = useState('WAITER');
-    const [supportedRoles, setSupportedRoles] = useState([
-        { value: 'WAITER', label: 'Nhân viên phục vụ'},
-        { value: 'MANAGER', label: 'Quản lý'},
-        { value: 'OWNER', label: 'Chủ quán'},
-    ]);
+    const [supportedRoles, setSupportedRoles] = useState([]);
 
     useEffect(() => {
         const loadRoles = async () => {
@@ -86,16 +82,16 @@ export function AccessKeySettingsPage() {
     };
 
     const handleRevokeKey = async (keyId) => {
-        if (!window.confirm('Bạn có chắc muốn vô hiệu hoá khoá này? Nhân viên sử dụng khoá này sẽ bị đăng xuất.')) {
+        if (!window.confirm('Bạn có chắc muốn xóa khoá này? Nhân viên sử dụng khoá này sẽ bị đăng xuất.')) {
             return;
         }
 
         try {
             await revokeAccessKey(tenant.id, keyId);
-            toast.success('Đã vô hiệu hoá khoá!');
+            toast.success('Đã xóa khoá!');
             fetchKeys();
         } catch (error) {
-            toast.error(error.message || 'Lỗi khi vô hiệu hoá khoá');
+            toast.error(error.message || 'Lỗi khi xóa khoá');
         }
     };
 
@@ -131,7 +127,7 @@ export function AccessKeySettingsPage() {
                                         <h4>{key.name}</h4>
                                         <div className="key-meta">
                                             <div className={`key-status ${key.isActive ? 'active' : 'inactive'}`}>
-                                                {key.isActive ? 'Đang hoạt động' : 'Đã vô hiệu hoá'}
+                                                {key.isActive ? 'Đang hoạt động' : 'Đã xóa'}
                                             </div>
                                             <div className="key-role">
                                                 {key.role}
@@ -156,7 +152,7 @@ export function AccessKeySettingsPage() {
                                                 variant="danger"
                                                 onClick={() => handleRevokeKey(key.id)}
                                             >
-                                                Vô hiệu hoá
+                                                Xóa
                                             </Button>
                                         )}
                                     </div>
