@@ -83,9 +83,6 @@ public class ServingSession extends BaseEntity {
     @Column(name = "ended_at")
     private LocalDateTime endedAt;
 
-    @Column(name = "guest_count")
-    private Integer guestCount;
-
     @Column(length = 500)
     private String note;
 

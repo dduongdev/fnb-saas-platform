@@ -143,7 +143,7 @@ public class SessionController {
      * 
      * <p><b>Auto-create Order:</b> Tự động tạo 1 order mặc định cho session.</p>
      * 
-     * @param request chứa tableId, guestCount (optional), note (optional)
+     * @param request chứa tableId, note (optional)
      * @return ApiResponse chứa SessionResponse mới tạo
      * @throws AppException 404 nếu bàn không tồn tại
      */
@@ -168,6 +168,15 @@ public class SessionController {
     public ApiResponse<SessionResponse> getSession(@PathVariable Long sessionId) {
         ServingSession session = sessionService.getSession(sessionId);
         return ApiResponse.success(SessionResponse.fromEntity(session));
+    }
+
+    @GetMapping("/history")
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
+    public ApiResponse<org.springframework.data.domain.Page<SessionResponse>> getSessionHistory(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ApiResponse.success(sessionService.getSessionHistory(page, size));
     }
 
     /**

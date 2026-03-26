@@ -44,18 +44,22 @@ export function NotificationsPage() {
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [page, setPage] = useState(0);
+    const [size, setSize] = useState(20);
+    const [totalPages, setTotalPages] = useState(0);
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [showUnreadOnly, setShowUnreadOnly] = useState(false);
 
     // Load notifications from API
-    const loadNotifications = async () => {
+    const loadNotifications = async (pageNumber = page, pageSize = size) => {
         try {
             setLoading(true);
             const [data, count] = await Promise.all([
-                getNotifications(0, 50),
+                getNotifications(pageNumber, pageSize),
                 getUnreadCount()
             ]);
             setNotifications(data.content || []);
+            setTotalPages(data.totalPages || 0);
             setUnreadCount(count || 0);
         } catch (error) {
             console.error('Failed to load notifications:', error);
@@ -66,8 +70,8 @@ export function NotificationsPage() {
     };
 
     useEffect(() => {
-        loadNotifications();
-    }, []);
+        loadNotifications(page, size);
+    }, [page, size]);
 
     // Subscribe to tenant notifications via WebSocket
     const handleNotification = useCallback((message) => {
@@ -167,7 +171,7 @@ export function NotificationsPage() {
 
     const headerActions = (
         <div className="header-actions">
-            <Button variant="ghost" onClick={loadNotifications} title="Làm mới">
+            <Button variant="ghost" onClick={() => loadNotifications(page, size)} title="Làm mới">
                 <RefreshCw size={18} />
             </Button>
             <Button variant="outline" onClick={markAllRead} disabled={unreadCount === 0}>
@@ -289,6 +293,20 @@ export function NotificationsPage() {
                                 />
                             ))
                         )}
+                    </div>
+                </div>
+
+                <div className="notifications-pagination">
+                    <Button onClick={() => setPage((p) => Math.max(p - 1, 0))} disabled={page <= 0}>Trước</Button>
+                    <span>Trang {page + 1} / {Math.max(totalPages, 1)}</span>
+                    <Button onClick={() => setPage((p) => Math.min(p + 1, totalPages - 1))} disabled={page >= totalPages - 1}>Sau</Button>
+                    <div className="notifications-page-size">
+                        <span>Số dòng</span>
+                        <select value={size} onChange={(e) => { setSize(Number(e.target.value)); setPage(0); }}>
+                            <option value={10}>10</option>
+                            <option value={20}>20</option>
+                            <option value={50}>50</option>
+                        </select>
                     </div>
                 </div>
             </div>

@@ -22,7 +22,6 @@ import java.util.stream.Collectors;
  *   <li>sessionId: ID duy nhất của session</li>
  *   <li>status: Trạng thái (PENDING, ACTIVE, COMPLETED, CANCELLED)</li>
  *   <li>startedAt, endedAt: Thời gian bắt đầu và kết thúc session</li>
- *   <li>guestCount: Số khách</li>
  *   <li>note: Ghi chú session</li>
  *   <li>tables: Danh sách bàn trong session (có thể nhiều bàn merged)</li>
  *   <li>orders: Danh sách orders thuộc session, mỗi order gắn với 1 bàn</li>
@@ -46,7 +45,6 @@ public class SessionResponse {
     private ServingSession.SessionStatus status;
     private LocalDateTime startedAt;
     private LocalDateTime endedAt;
-    private Integer guestCount;
     private String note;
     private List<SessionTableDto> tables;
     private List<SessionOrderDto> orders;
@@ -124,7 +122,6 @@ public class SessionResponse {
                 .status(session.getStatus())
                 .startedAt(session.getStartedAt())
                 .endedAt(session.getEndedAt())
-                .guestCount(session.getGuestCount())
                 .note(session.getNote())
                 .tables(tableDtos)
                 .orders(orderDtos)

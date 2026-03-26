@@ -81,13 +81,26 @@ public class SessionService {
      *   <li>Gửi WebSocket notifications</li>
      * </ol>
      * 
-     * @param request chứa tableId, guestCount, note
+     * @param request chứa tableId, note
      * @return ServingSession đã tạo hoặc session hiện tại nếu bàn đang active
      * @throws AppException 404 nếu bàn không tồn tại
      */
-    private void recordAction(String action, String targetType, String targetId, java.math.BigDecimal amount, String note) {
+    private void recordAction(String action, String targetType, String targetId, java.math.BigDecimal amount, String note, Long sessionId) {
         if (auditService != null) {
-            auditService.record(action, targetType, targetId, amount, note);
+            auditService.record(action, targetType, targetId, amount, note, sessionId);
+        }
+    }
+
+    private void recordAction(String action, String targetType, String targetId, java.math.BigDecimal amount, String note) {
+        Long sessionId = null;
+        if ("SESSION".equals(targetType)) {
+            try {
+                sessionId = targetId != null ? Long.valueOf(targetId) : null;
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        if (auditService != null) {
+            auditService.record(action, targetType, targetId, amount, note, sessionId);
         }
     }
 
@@ -106,7 +119,6 @@ public class SessionService {
         ServingSession session = ServingSession.builder()
                 .status(ServingSession.SessionStatus.ACTIVE)
                 .startedAt(LocalDateTime.now())
-                .guestCount(request.getGuestCount())
                 .note(request.getNote())
                 .tables(new HashSet<>())
                 .orders(new HashSet<>())
@@ -135,7 +147,7 @@ public class SessionService {
         notifySessionUpdate(session); // Gửi đến customer đang subscribe table topic
 
         recordAction("session.open", "SESSION", String.valueOf(session.getId()), null,
-                "Mở session cho bàn " + table.getName());
+                "Mở session cho bàn " + table.getName(), session.getId());
 
         return session;
     }
@@ -239,7 +251,7 @@ public class SessionService {
                 "Bàn " + session.getTableNames() + " vừa gọi thêm món");
 
         recordAction("session.add_item", "SESSION", String.valueOf(session.getId()), order.getTotalAmount(),
-                "Thêm " + request.getItems().size() + " món: " + String.join(", ", addedItems));
+                "Thêm " + request.getItems().size() + " món: " + String.join(", ", addedItems), session.getId());
     }
 
     /**
@@ -302,7 +314,7 @@ public class SessionService {
                 "Bàn " + session.getTableNames() + " vừa xóa món");
 
         recordAction("session.remove_item", "ORDER_ITEM", String.valueOf(itemId), order.getTotalAmount(),
-                "Xóa " + item.getQuantity() + "x " + item.getProduct().getName());
+                "Xóa " + item.getQuantity() + "x " + item.getProduct().getName(), session.getId());
     }
 
     /**
@@ -347,7 +359,7 @@ public class SessionService {
                 "Đã thêm bàn " + table.getName() + " vào session");
 
         recordAction("session.attach_table", "TABLE", table.getId(), null,
-                "Attach table " + table.getName() + " vào session");
+                "Attach table " + table.getName() + " vào session", session.getId());
     }
 
     /**
@@ -406,7 +418,7 @@ public class SessionService {
                 "Đã tách bàn " + table.getName() + " khỏi session");
 
         recordAction("session.detach_table", "TABLE", table.getId(), null,
-                "Detach table " + table.getName());
+                "Detach table " + table.getName(), session.getId());
     }
 
     /**
@@ -474,7 +486,7 @@ public class SessionService {
                 "Bàn " + session.getTableNames() + " vừa cập nhật số lượng món");
 
         recordAction("session.update_item_quantity", "ORDER_ITEM", String.valueOf(itemId), order.getTotalAmount(),
-                "Cập nhật số lượng " + item.getProduct().getName() + " từ " + oldQuantity + " -> " + newQuantity);
+                "Cập nhật số lượng " + item.getProduct().getName() + " từ " + oldQuantity + " -> " + newQuantity, session.getId());
 
     }
 
@@ -525,7 +537,7 @@ public class SessionService {
                 "Bàn " + session.getTableNames() + ": Đã mang ra món " + item.getProduct().getName());
 
         recordAction("session.serve_item", "ORDER_ITEM", String.valueOf(itemId), item.getPrice().multiply(java.math.BigDecimal.valueOf(item.getQuantity())),
-                "Serve " + item.getQuantity() + "x " + item.getProduct().getName());
+                "Serve " + item.getQuantity() + "x " + item.getProduct().getName(), session.getId());
     }
 
     /**
@@ -588,7 +600,7 @@ public class SessionService {
 
         var invoice = createInvoice(session);
         recordAction("session.pay", "INVOICE", String.valueOf(invoice.getOrderId()), invoice.getTotalAmount(),
-                "Thanh toán session: " + invoice.getTotalAmount() + " bằng " + request.getMethod());
+                "Thanh toán session: " + invoice.getTotalAmount() + " bằng " + request.getMethod(), session.getId());
 
         return invoice;
     }
@@ -641,7 +653,7 @@ public class SessionService {
         notifySessionUpdate(session);
 
         recordAction("session.cancel", "SESSION", String.valueOf(session.getId()), null,
-                "Hủy session: " + (request.getReason() != null ? request.getReason() : "Không có lý do"));
+                "Hủy session: " + (request.getReason() != null ? request.getReason() : "Không có lý do"), session.getId());
     }
 
     /**
@@ -804,6 +816,12 @@ public class SessionService {
                 .toList();
     }
 
+    public org.springframework.data.domain.Page<SessionResponse> getSessionHistory(int page, int size) {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size, org.springframework.data.domain.Sort.by("startedAt").descending());
+        return sessionRepository.findSessionHistory(pageable)
+                .map(SessionResponse::fromEntity);
+    }
+
     /**
      * Nhân viên xác nhận session từ khách (PENDING → ACTIVE).
      * 
@@ -847,7 +865,7 @@ public class SessionService {
                 "✅ Order bàn " + session.getTableNames() + " đã được xác nhận");
 
         recordAction("session.confirm", "SESSION", String.valueOf(session.getId()), null,
-                "Xác nhận session");
+                "Xác nhận session", session.getId());
 
         return session;
     }
@@ -908,7 +926,7 @@ public class SessionService {
                 "❌ Order bàn " + session.getTableNames() + " đã bị từ chối");
 
         recordAction("session.reject", "SESSION", String.valueOf(session.getId()), null,
-                "Từ chối session: " + (reason != null ? reason : "Không có lý do"));
+                "Từ chối session: " + (reason != null ? reason : "Không có lý do"), session.getId());
     }
 
     /**

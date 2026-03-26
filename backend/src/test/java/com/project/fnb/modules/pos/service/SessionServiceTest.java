@@ -89,14 +89,12 @@ class SessionServiceTest {
         // Arrange
         SessionRequest.OpenSession request = new SessionRequest.OpenSession();
         request.setTableId(tableId);
-        request.setGuestCount(4);
         
         when(tableRepository.findById(tableId)).thenReturn(Optional.of(table));
         
         ServingSession newSession = new ServingSession();
         newSession.setId(1L);
         newSession.getTables().add(table);
-        newSession.setGuestCount(4);
         newSession.setStatus(ServingSession.SessionStatus.ACTIVE);
         when(sessionRepository.save(any(ServingSession.class))).thenReturn(newSession);
 
@@ -265,7 +263,7 @@ class SessionServiceTest {
         
         assertEquals(3, item.getQuantity());
         verify(orderItemRepository).save(item);
-        verify(posActionAuditService).record("session.update_item_quantity", "ORDER_ITEM", "100", order.getTotalAmount(), "Cập nhật số lượng " + product.getName() + " từ 1 -> 3");
+        verify(posActionAuditService).record("session.update_item_quantity", "ORDER_ITEM", "100", order.getTotalAmount(), "Cập nhật số lượng " + product.getName() + " từ 1 -> 3", 1L);
     }
 
     @Test

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PageLayout } from '../../components/layout';
 import { Card, Input, Button, Loading } from '../../components/common';
 import { getPosActionAudit } from '../../api/tenant';
+import { getSession } from '../../api/session';
 import './PosAuditPage.css';
 
 export function PosAuditPage() {
@@ -47,6 +49,25 @@ export function PosAuditPage() {
 
     const gotoPrevPage = () => setPage((p) => Math.max(p - 1, 0));
     const gotoNextPage = () => setPage((p) => Math.min(p + 1, totalPages - 1));
+
+    const navigate = useNavigate();
+
+    const handleGoToSession = async (sessionId) => {
+        if (!sessionId) return;
+        try {
+            const session = await getSession(sessionId);
+            if (!session) return;
+            if (session.status === 'ACTIVE' || session.status === 'PENDING') {
+                const tableId = session.tables?.[0]?.id;
+                navigate(`/pos${tableId ? `?table=${tableId}` : ''}`);
+            } else {
+                navigate(`/sessions/${sessionId}`);
+            }
+        } catch (err) {
+            console.error('Không mở được session', err);
+            navigate(`/sessions/${sessionId}`);
+        }
+    };
 
     return (
         <PageLayout title="Audit hành động POS">
@@ -98,6 +119,7 @@ export function PosAuditPage() {
                                     <th>User/Access Key</th>
                                     <th>Role</th>
                                     <th>Target</th>
+                                    <th>Session</th>
                                     <th>Số tiền</th>
                                     <th>Ghi chú</th>
                                 </tr>
@@ -124,6 +146,15 @@ export function PosAuditPage() {
                                                 <td>{userDisplay}</td>
                                                 <td>{roleDisplay}</td>
                                                 <td>{record.targetType} / {record.targetId}</td>
+                                                <td>
+                                                    {record.sessionId ? (
+                                                        <Button variant="link" onClick={() => handleGoToSession(record.sessionId)}>
+                                                            Xem session {record.sessionId}
+                                                        </Button>
+                                                    ) : (
+                                                        '-'
+                                                    )}
+                                                </td>
                                                 <td>{record.amount ? new Intl.NumberFormat('vi-VN').format(record.amount) + 'đ' : '-'}</td>
                                                 <td>{record.note}</td>
                                             </tr>

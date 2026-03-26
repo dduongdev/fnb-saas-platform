@@ -13,12 +13,11 @@ import { api } from './client';
  * Mở bàn (tạo session mới với status ACTIVE)
  * @param {Object} params
  * @param {number} params.tableId - ID bàn
- * @param {number} [params.guestCount] - Số khách (optional)
  * @param {string} [params.note] - Ghi chú (optional)
  * @returns {Promise<SessionResponse>}
  */
-export const openSession = ({ tableId, guestCount = null, note = null }) =>
-    api.post('/api/pos/sessions', { tableId, guestCount, note });
+export const openSession = ({ tableId, note = null }) =>
+    api.post('/api/pos/sessions', { tableId, note });
 
 /**
  * Lấy session theo ID
@@ -148,6 +147,12 @@ export const getActiveSessions = () =>
  */
 export const getPendingSessions = () =>
     api.get('/api/pos/sessions/pending');
+
+/**
+ * Lấy lịch sử session (có phân trang)
+ */
+export const getSessionHistory = (page = 0, size = 20) =>
+    api.get(`/api/pos/sessions/history?page=${page}&size=${size}`);
 
 /**
  * Xác nhận session (PENDING → ACTIVE)

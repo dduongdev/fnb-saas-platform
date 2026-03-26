@@ -45,6 +45,9 @@ public class PosActionAudit {
     @Column(name = "target_id", length = 64)
     private String targetId;
 
+    @Column(name = "session_id")
+    private Long sessionId;
+
     @Column(name = "amount", precision = 19, scale = 2)
     private BigDecimal amount;
 

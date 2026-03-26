@@ -50,7 +50,6 @@ public class SessionRequest {
         @NotNull(message = "tableId là bắt buộc")
         private String tableId;
 
-        private Integer guestCount;
         private String note;
     }
 

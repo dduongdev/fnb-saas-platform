@@ -1,6 +1,8 @@
 package com.project.fnb.modules.pos.repository;
 
 import com.project.fnb.modules.pos.entity.ServingSession;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -124,4 +126,12 @@ public interface SessionRepository extends JpaRepository<ServingSession, Long> {
            "WHERE s.status = 'ACTIVE' " +
            "ORDER BY s.startedAt DESC")
     List<ServingSession> findActiveSessions();
+
+    @Query("SELECT s FROM ServingSession s " +
+           "LEFT JOIN FETCH s.tables t " +
+           "LEFT JOIN FETCH s.orders o " +
+           "LEFT JOIN FETCH o.items i " +
+           "LEFT JOIN FETCH i.product " +
+           "ORDER BY s.startedAt DESC")
+    Page<ServingSession> findSessionHistory(Pageable pageable);
 }

@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, Users, DollarSign, Table2, Eye, CreditCard, X, Bell, Plus, ArrowRightLeft, UserPlus } from 'lucide-react';
 import { PageLayout } from '../../components/layout';
-import { Button, Card, Loading, Empty, StatusBadge, Modal, ModalFooter, Skeleton } from '../../components/common';
+import { Button, Card, Loading, Empty, Input, StatusBadge, Modal, ModalFooter, Skeleton } from '../../components/common';
 import { useToast } from '../../context/ToastContext';
 import { usePendingSessionsWebSocket } from '../../hooks/useWebSocket';
 import {
     getActiveSessions,
     getPendingSessions,
+    getSessionHistory,
     confirmSession,
     rejectSession,
     paySession,
@@ -25,8 +26,12 @@ export function SessionListPage() {
     
     const [activeSessions, setActiveSessions] = useState([]);
     const [pendingSessions, setPendingSessions] = useState([]);
+    const [historySessions, setHistorySessions] = useState([]);
+    const [historyPage, setHistoryPage] = useState(0);
+    const [historySize, setHistorySize] = useState(20);
+    const [historyTotalPages, setHistoryTotalPages] = useState(0);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('active'); // 'active' | 'pending'
+    const [activeTab, setActiveTab] = useState('active'); // 'active' | 'pending' | 'history'
     
     // Modals
     const [selectedSession, setSelectedSession] = useState(null);
@@ -57,7 +62,14 @@ export function SessionListPage() {
 
     useEffect(() => {
         loadSessions();
+        loadHistory();
     }, []);
+
+    useEffect(() => {
+        if (activeTab === 'history') {
+            loadHistory();
+        }
+    }, [activeTab, historyPage, historySize]);
 
     // WebSocket for real-time pending sessions
     const handlePendingUpdate = useCallback((data) => {
@@ -81,6 +93,20 @@ export function SessionListPage() {
             toast.error('Không thể tải danh sách phiên');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadHistory = async () => {
+        try {
+            setHistoryLoading(true);
+            const data = await getSessionHistory(historyPage, historySize);
+            setHistorySessions(data.content || []);
+            setHistoryTotalPages(data.totalPages || 0);
+        } catch (error) {
+            console.error('Failed to load session history:', error);
+            toast.error('Không thể tải lịch sử session');
+        } finally {
+            setHistoryLoading(false);
         }
     };
 
@@ -150,7 +176,6 @@ export function SessionListPage() {
             setOpenSessionLoading(true);
             await openSession({
                 tableId: selectedTableId,
-                guestCount: null,
                 note: null
             });
             toast.success('Đã mở phiên mới!');
@@ -314,7 +339,15 @@ export function SessionListPage() {
         }
     };
 
-    const currentSessions = activeTab === 'active' ? activeSessions : pendingSessions;
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [historyFilterStatus, setHistoryFilterStatus] = useState('');
+    const [historySearchTerm, setHistorySearchTerm] = useState('');
+
+    const currentSessions = activeTab === 'active'
+        ? activeSessions
+        : activeTab === 'pending'
+            ? pendingSessions
+            : historySessions;
 
     if (loading) {
         return (
@@ -368,18 +401,137 @@ export function SessionListPage() {
                         <span className="tab-badge warning">{pendingSessions.length}</span>
                     )}
                 </button>
+                <button
+                    className={`session-tab ${activeTab === 'history' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('history')}
+                >
+                    <Clock size={18} />
+                    Lịch sử
+                    {historySessions.length > 0 && (
+                        <span className="tab-badge info">{historySessions.length}</span>
+                    )}
+                </button>
             </div>
 
             {/* Session List */}
             {currentSessions.length === 0 ? (
                 <Empty
-                    icon={activeTab === 'active' ? Users : Bell}
-                    message={activeTab === 'active' ? 'Không có phiên đang hoạt động' : 'Không có đơn chờ xác nhận'}
+                    icon={activeTab === 'active' ? Users : activeTab === 'pending' ? Bell : Clock}
+                    message={activeTab === 'active' ? 'Không có phiên đang hoạt động' : activeTab === 'pending' ? 'Không có đơn chờ xác nhận' : 'Không có lịch sử'}
                     description={activeTab === 'active' 
                         ? 'Các phiên phục vụ sẽ hiển thị tại đây'
-                        : 'Đơn hàng từ khách quét QR sẽ hiển thị tại đây'
+                        : activeTab === 'pending'
+                            ? 'Đơn hàng từ khách quét QR sẽ hiển thị tại đây'
+                            : 'Bạn có thể xem lại tất cả session đã dịch vụ ở đây'
                     }
                 />
+            ) : activeTab === 'history' ? (
+                <div>
+                    <div className="session-history-filters" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                        <label>Trạng thái:</label>
+                        <input
+                            type="text"
+                            value={historyFilterStatus}
+                            onChange={(e) => setHistoryFilterStatus(e.target.value.toUpperCase())}
+                            placeholder="ACTIVE, COMPLETED, CANCELLED, PENDING"
+                        />
+                        <Button onClick={() => { setHistoryPage(0); loadHistory(); }}>
+                            Lọc
+                        </Button>
+                    </div>
+
+                    {historyLoading ? (
+                        <Loading />
+                    ) : (
+                        <div className="session-history-panel">
+                            <div className="session-history-actions">
+                                <div className="session-history-filter-group">
+                                    <Input
+                                        placeholder="Tìm theo ID/Bàn/..."
+                                        value={historySearchTerm}
+                                        onChange={(e) => setHistorySearchTerm(e.target.value)}
+                                    />
+                                    <select
+                                        value={historyFilterStatus}
+                                        onChange={(e) => setHistoryFilterStatus(e.target.value)}
+                                    >
+                                        <option value="">Tất cả trạng thái</option>
+                                        <option value="ACTIVE">ACTIVE</option>
+                                        <option value="PENDING">PENDING</option>
+                                        <option value="COMPLETED">COMPLETED</option>
+                                        <option value="CANCELLED">CANCELLED</option>
+                                    </select>
+                                    <Button onClick={() => { setHistoryPage(0); loadHistory(); }}>Lọc</Button>
+                                </div>
+
+                                <div className="session-history-meta">
+                                    <span>{historySessions.length} phiên lịch sử</span>
+                                    <span>Trang {historyPage + 1} / {historyTotalPages || 1}</span>
+                                </div>
+                            </div>
+
+                            <div className="session-history-table-wrapper">
+                                <table className="session-history-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Session ID</th>
+                                            <th>Trạng thái</th>
+                                            <th>Bàn</th>
+                                            <th>Bắt đầu</th>
+                                            <th>Kết thúc</th>
+                                            <th>Tổng</th>
+                                            <th>Hành động</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {(historySessions.filter(item => {
+                                            const matchStatus = !historyFilterStatus || item.status === historyFilterStatus;
+                                            const text = historySearchTerm.trim().toLowerCase();
+                                            const matchText = !text ||
+                                                item.sessionId?.toString().includes(text) ||
+                                                item.tables?.some(t => t.name.toLowerCase().includes(text));
+                                            return matchStatus && matchText;
+                                        }).length === 0) ? (
+                                            <tr><td colSpan={7} style={{ textAlign: 'center' }}>Không có lịch sử</td></tr>
+                                        ) : historySessions
+                                            .filter(item => {
+                                                const matchStatus = !historyFilterStatus || item.status === historyFilterStatus;
+                                                const text = historySearchTerm.trim().toLowerCase();
+                                                const matchText = !text ||
+                                                    item.sessionId?.toString().includes(text) ||
+                                                    item.tables?.some(t => t.name.toLowerCase().includes(text));
+                                                return matchStatus && matchText;
+                                            })
+                                            .map((item) => (
+                                                <tr key={item.sessionId} className={`status-${item.status.toLowerCase()}`}>
+                                                    <td>{item.sessionId}</td>
+                                                    <td className="status-cell">{item.status}</td>
+                                                    <td>{item.tables?.map(t => t.name).join(', ') || '-'}</td>
+                                                    <td>{item.startedAt ? new Date(item.startedAt).toLocaleString('vi-VN') : '-'}</td>
+                                                    <td>{item.endedAt ? new Date(item.endedAt).toLocaleString('vi-VN') : '-'}</td>
+                                                    <td>{item.totalAmount ? new Intl.NumberFormat('vi-VN').format(item.totalAmount) + 'đ' : '-'}</td>
+                                                    <td>
+                                                        <Button size="sm" variant="primary" onClick={() => navigate(`/sessions/${item.sessionId}`)}>Xem</Button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <Button onClick={() => setHistoryPage(prev => Math.max(prev - 1, 0))} disabled={historyPage <= 0}>Trước</Button>
+                        <span>Trang {historyPage + 1}/{historyTotalPages || 1}</span>
+                        <Button onClick={() => setHistoryPage(prev => Math.min(prev + 1, Math.max(historyTotalPages - 1, 0)))} disabled={historyPage >= historyTotalPages - 1}>Sau</Button>
+                        <select value={historySize} onChange={e => setHistorySize(Number(e.target.value))}>
+                            <option value={10}>10</option>
+                            <option value={20}>20</option>
+                            <option value={50}>50</option>
+                        </select>
+                    </div>
+                </div>
             ) : (
                 <div className="session-grid">
                     {currentSessions.map(session => (
@@ -402,12 +554,6 @@ export function SessionListPage() {
                                     <span className="session-duration">({formatDuration(session.startedAt)})</span>
                                 </div>
 
-                                {session.guestCount && (
-                                    <div className="session-info-row">
-                                        <Users size={16} />
-                                        <span>{session.guestCount} khách</span>
-                                    </div>
-                                )}
 
                                 <div className="session-info-row">
                                     <DollarSign size={16} />

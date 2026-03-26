@@ -70,7 +70,6 @@ export function POSPage() {
     const [openTableLoading, setOpenTableLoading] = useState(false);
     const [targetTableId, setTargetTableId] = useState('');
     const [mergeTableIds, setMergeTableIds] = useState([]);
-    const [guestCount, setGuestCount] = useState('');
     const [sessionNote, setSessionNote] = useState('');
 
     useEffect(() => {
@@ -247,7 +246,6 @@ export function POSPage() {
             setOpenTableLoading(true);
             const sessionData = await openSession({
                 tableId: selectedTableId,
-                guestCount: null,
                 note: null
             });
             setSession(sessionData);

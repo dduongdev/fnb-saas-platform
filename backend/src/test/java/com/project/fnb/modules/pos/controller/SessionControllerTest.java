@@ -59,7 +59,6 @@ public class SessionControllerTest {
     void openSession_ShouldReturnSessionResponse() throws Exception {
         SessionRequest.OpenSession request = new SessionRequest.OpenSession();
         request.setTableId("table-1");
-        request.setGuestCount(2);
 
         ServingSession session = new ServingSession();
         session.setId(1L);

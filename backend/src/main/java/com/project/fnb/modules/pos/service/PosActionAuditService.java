@@ -22,7 +22,7 @@ public class PosActionAuditService {
     }
 
     @Transactional
-    public void record(String action, String targetType, String targetId, BigDecimal amount, String note) {
+    public void record(String action, String targetType, String targetId, BigDecimal amount, String note, Long sessionId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         String userId = null;
@@ -60,11 +60,24 @@ public class PosActionAuditService {
                 .action(action)
                 .targetType(targetType)
                 .targetId(targetId)
+                .sessionId(sessionId)
                 .amount(amount)
                 .note(note)
                 .build();
 
         repository.save(audit);
+    }
+
+    @Transactional
+    public void record(String action, String targetType, String targetId, BigDecimal amount, String note) {
+        Long sId = null;
+        if ("SESSION".equals(targetType)) {
+            try {
+                sId = targetId != null ? Long.valueOf(targetId) : null;
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        record(action, targetType, targetId, amount, note, sId);
     }
 
     public org.springframework.data.domain.Page<PosActionAudit> queryAudit(String tenantId, String action, String userId, String accessKeyId, String targetType, int page, int size) {

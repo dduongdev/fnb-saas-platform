@@ -10,6 +10,8 @@ import { UserProfilePage } from './pages/auth/UserProfilePage';
 import { POSPage } from './pages/pos/POSPage';
 import { TableGridPage } from './pages/pos/TableGridPage';
 import { SessionListPage } from './pages/pos/SessionListPage';
+import { SessionHistoryPage } from './pages/pos/SessionHistoryPage';
+import { SessionDetailPage } from './pages/pos/SessionDetailPage';
 import { ProductListPage } from './pages/menu/ProductListPage';
 import { CategoryListPage } from './pages/menu/CategoryListPage';
 import { ReportsPage } from './pages/reports/ReportsPage';
@@ -146,6 +148,26 @@ function AppRoutes() {
           <ProtectedRoute>
             <TenantRoute>
               <SessionListPage />
+            </TenantRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/sessions/history"
+        element={
+          <ProtectedRoute>
+            <TenantRoute>
+              <SessionHistoryPage />
+            </TenantRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/sessions/:sessionId"
+        element={
+          <ProtectedRoute>
+            <TenantRoute>
+              <SessionDetailPage />
             </TenantRoute>
           </ProtectedRoute>
         }
