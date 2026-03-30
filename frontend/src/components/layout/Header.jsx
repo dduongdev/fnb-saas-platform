@@ -1,11 +1,13 @@
 import { User, ChevronDown } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { NotificationBell } from '../common';
 import './Header.css';
 
 export function Header({ title }) {
     const { user, logout } = useAuth();
+    const navigate = useNavigate();
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
 
@@ -54,7 +56,7 @@ export function Header({ title }) {
                             </div>
                             <hr className="header-dropdown-divider" />
                             {!user?.isWaitstaff && (
-                                <button className="header-dropdown-item" onClick={() => window.location.href = '/profile'}>
+                                <button className="header-dropdown-item" onClick={() => navigate('/dashboard?profile=true')}>
                                     Hồ sơ cá nhân
                                 </button>
                             )}

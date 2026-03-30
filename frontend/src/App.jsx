@@ -5,8 +5,7 @@ import { ToastProvider } from './context/ToastContext';
 import { Loading } from './components/common';
 
 // Pages
-import { DashboardPage, MyShopsPage } from './pages/dashboard';
-import { UserProfilePage } from './pages/auth/UserProfilePage';
+import { DashboardPage } from './pages/dashboard';
 import { POSPage } from './pages/pos/POSPage';
 import { TableGridPage } from './pages/pos/TableGridPage';
 import { SessionListPage } from './pages/pos/SessionListPage';
@@ -21,7 +20,7 @@ import { AccessKeySettingsPage } from './pages/settings/AccessKeySettingsPage';
 import { PosAuditPage } from './pages/settings/PosAuditPage';
 import { MenuPage } from './pages/customer/MenuPage';
 import { CustomerMenuPage } from './pages/customer/CustomerMenuPage';
-import { WaitstaffLoginPage } from './pages/auth/WaitstaffLoginPage';
+import { AccessKeyLoginPage } from './pages/auth/AccessKeyLoginPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { PublicTenantListPage } from './pages/auth/PublicTenantListPage';
@@ -53,7 +52,7 @@ function TenantRoute({ children }) {
   }
 
   if (!tenant) {
-    return <Navigate to="/my-shops" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
@@ -78,7 +77,7 @@ function AppRoutes() {
       <Route path="/table/:tableId" element={<CustomerMenuPage />} />
       <Route path="/menu/:tenantId" element={<MenuPage />} />
       <Route path="/menu/:tenantId/:tableId" element={<CustomerMenuPage />} />
-      <Route path="/waiter-login" element={<WaitstaffLoginPage />} />
+      <Route path="/access-key-login" element={<AccessKeyLoginPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
 
@@ -91,25 +90,9 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/my-shops"
-        element={
-          <ProtectedRoute>
-            <MyShopsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/profile"
-        element={
-          <ProtectedRoute>
-            <UserProfilePage />
-          </ProtectedRoute>
-        }
-      />
 
       {/* Auth Routes */}
-      {/* /select-tenant removed - use /my-shops instead */}
+      {/* /select-tenant removed - use /dashboard instead */}
 
       {/* POS Routes */}
       <Route

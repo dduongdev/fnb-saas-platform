@@ -159,21 +159,6 @@ export function POSPage() {
         }
     };
 
-    const withDefaultCategory = (categories) => {
-        const normalized = Array.isArray(categories) ? categories : [];
-        if (normalized.some(cat => cat.categoryId === 'other')) {
-            return normalized;
-        }
-        return [
-            ...normalized,
-            {
-                categoryId: 'other',
-                categoryName: 'Khác',
-                products: []
-            }
-        ];
-    };
-
     const loadInitialData = async () => {
         try {
             const [tablesData, menuData] = await Promise.all([
@@ -181,10 +166,10 @@ export function POSPage() {
                 getPublicMenu()
             ]);
             setTables(tablesData || []);
-            const normalizedMenu = withDefaultCategory(menuData || []);
+            const normalizedMenu = Array.isArray(menuData) ? menuData : [];
             setMenu(normalizedMenu);
 
-            if (normalizedMenu && normalizedMenu.length > 0) {
+            if (normalizedMenu.length > 0) {
                 setSelectedCategory(normalizedMenu[0].categoryId);
             }
 

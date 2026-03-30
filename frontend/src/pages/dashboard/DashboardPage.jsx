@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-    Store, User, Settings, ChefHat, CreditCard, 
+    Store, User, Camera, Settings, ChefHat, CreditCard, 
     BarChart3, Users, Coffee, ArrowRight, Plus,
     Sparkles, Shield, Zap, Globe
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
-import { Card, Button, Loading } from '../../components/common';
-import { getMyTenants } from '../../api/tenant';
+import { Card, Button, Loading, Modal, Input } from '../../components/common';
+import { createTenant } from '../../api/tenant';
+import { uploadAvatar } from '../../api/auth';
+import { useToast } from '../../context/ToastContext';
 import './DashboardPage.css';
 
 /**
@@ -21,34 +23,103 @@ import './DashboardPage.css';
  */
 export function DashboardPage() {
     const navigate = useNavigate();
+    const location = useLocation();
     const { user, logout } = useAuth();
-    const { selectTenant } = useTenant();
-    const [tenants, setTenants] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const { tenants, loading, selectTenant, reloadTenants } = useTenant();
+    const toast = useToast();
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [showProfileModal, setShowProfileModal] = useState(false);
+    const [profileUploading, setProfileUploading] = useState(false);
+    const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || null);
+    const [creating, setCreating] = useState(false);
+    const [newShopName, setNewShopName] = useState('');
+    const [newShopAddress, setNewShopAddress] = useState('');
+    const [newShopLogo, setNewShopLogo] = useState(null);
+
+    // Dashboard reads tenants from TenantContext, no local API call needed.
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        if (params.get('profile') === 'true') {
+            setShowProfileModal(true);
+        }
+    }, [location.search]);
 
     useEffect(() => {
-        if (user?.isWaitstaff) {
-            navigate('/my-shops');
-            return;
+        const params = new URLSearchParams(location.search);
+        if (params.get('profile') === 'true') {
+            setShowProfileModal(true);
         }
-        loadTenants();
-    }, [user, navigate]);
+    }, [location.search]);
 
-    const loadTenants = async () => {
-        try {
-            const data = await getMyTenants();
-            setTenants(data || []);
-        } catch (error) {
-            console.error('Failed to load tenants:', error);
-        } finally {
-            setLoading(false);
+    useEffect(() => {
+        if (user?.avatarUrl) {
+            setAvatarUrl(user.avatarUrl);
         }
-    };
+    }, [user]);
 
     const handleSelectTenant = async (tenant) => {
         // Use context to properly set tenant state
         await selectTenant(tenant.id);
         navigate('/pos');
+    };
+
+    const handleCreateShop = async () => {
+        if (!newShopName.trim()) {
+            toast.warning('Vui lòng nhập tên quán');
+            return;
+        }
+
+        try {
+            setCreating(true);
+            await createTenant(newShopName.trim(), newShopAddress.trim(), newShopLogo);
+            toast.success('Tạo quán mới thành công');
+            setShowCreateModal(false);
+            setNewShopName('');
+            setNewShopAddress('');
+            setNewShopLogo(null);
+            await reloadTenants();
+        } catch (error) {
+            toast.error('Lỗi tạo quán: ' + error.message);
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    const handleLogoChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File ảnh quá lớn (max 5MB)');
+                return;
+            }
+            setNewShopLogo(file);
+        }
+    };
+
+    const handleAvatarChange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error('File ảnh quá lớn (max 5MB)');
+            return;
+        }
+
+        try {
+            setProfileUploading(true);
+            const data = await uploadAvatar(file);
+
+            if (data?.avatarUrl) {
+                setAvatarUrl(data.avatarUrl);
+            }
+
+            toast.success('Cập nhật ảnh đại diện thành công');
+            setShowProfileModal(false);
+        } catch (error) {
+            toast.error('Lỗi upload avatar: ' + error.message);
+        } finally {
+            setProfileUploading(false);
+        }
     };
 
     return (
@@ -62,10 +133,10 @@ export function DashboardPage() {
                     </div>
                 </div>
                 <div className="header-right">
-                    <Link to="/profile" className="header-link">
+                    <button className="header-link" onClick={() => setShowProfileModal(true)}>
                         <User size={18} />
                         <span>{user?.fullName || 'Tài khoản'}</span>
-                    </Link>
+                    </button>
                     <button className="btn-logout" onClick={logout}>
                         Đăng xuất
                     </button>
@@ -84,11 +155,11 @@ export function DashboardPage() {
             <main className="dashboard-main">
                 {/* My Shops Section */}
                 <section className="dashboard-section">
-                    <div className="section-header">
+                    <div className="section-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <h2><Store size={24} /> Quán của tôi</h2>
-                        <Link to="/my-shops" className="view-all-link">
-                            Xem tất cả <ArrowRight size={16} />
-                        </Link>
+                        <Button onClick={() => setShowCreateModal(true)}>
+                            Tạo quán mới
+                        </Button>
                     </div>
 
                     {loading ? (
@@ -98,7 +169,7 @@ export function DashboardPage() {
                             <Store size={48} className="empty-icon" />
                             <h3>Chưa có quán nào</h3>
                             <p>Bạn chưa sở hữu hoặc tham gia quản lý quán nào.</p>
-                            <Button onClick={() => navigate('/my-shops')}>
+                            <Button onClick={() => setShowCreateModal(true)}>
                                 Tạo quán mới
                             </Button>
                         </Card>
@@ -120,9 +191,6 @@ export function DashboardPage() {
                                     <div className="shop-info">
                                         <h3>{tenant.name}</h3>
                                         <p>{tenant.address || 'Chưa có địa chỉ'}</p>
-                                        <span className="shop-role owner">
-                                            👑 Chủ quán
-                                        </span>
                                     </div>
                                     <ArrowRight size={20} className="shop-arrow" />
                                 </Card>
@@ -135,11 +203,7 @@ export function DashboardPage() {
                 <section className="dashboard-section">
                     <h2><Zap size={24} /> Truy cập nhanh</h2>
                     <div className="quick-actions">
-                        <Card className="action-card" onClick={() => navigate('/my-shops')}>
-                            <Store size={28} />
-                            <span>Quán của tôi</span>
-                        </Card>
-                        <Card className="action-card" onClick={() => navigate('/profile')}>
+                        <Card className="action-card" onClick={() => setShowProfileModal(true)}>
                             <User size={28} />
                             <span>Hồ sơ cá nhân</span>
                         </Card>
@@ -199,6 +263,127 @@ export function DashboardPage() {
                     </div>
                 </section>
             </main>
+
+            <Modal
+                isOpen={showProfileModal}
+                onClose={() => {
+                    setShowProfileModal(false);
+                    navigate('/dashboard', { replace: true });
+                }}
+                title="Hồ sơ cá nhân"
+            >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ position: 'relative', width: 60, height: 60 }}>
+                            {avatarUrl ? (
+                                <img
+                                    src={avatarUrl}
+                                    alt={user?.fullName || user?.username || 'Tài khoản'}
+                                    style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+                                />
+                            ) : user?.avatarUrl ? (
+                                <img
+                                    src={user.avatarUrl}
+                                    alt={user.fullName || user.username}
+                                    style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+                                />
+                            ) : (
+                                <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <User size={32} />
+                                </div>
+                            )}
+                            <label
+                                style={{
+                                    position: 'absolute',
+                                    bottom: -4,
+                                    right: -4,
+                                    width: 24,
+                                    height: 24,
+                                    borderRadius: '50%',
+                                    background: '#fff',
+                                    border: '1px solid #ccc',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 0 4px rgba(0,0,0,0.2)'
+                                }}
+                                title="Cập nhật avatar"
+                            >
+                                <Camera size={14} />
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleAvatarChange}
+                                    style={{ display: 'none' }}
+                                    disabled={profileUploading}
+                                />
+                            </label>
+                        </div>
+                        <div>
+                            <h3 style={{ margin: 0 }}>{user?.fullName || user?.username || 'Tài khoản'}</h3>
+                            <p style={{ margin: '4px 0 0' }}>{user?.email}</p>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <span><strong>User ID:</strong> {user?.id || 'N/A'}</span>
+                    </div>
+                    {profileUploading && <span>Đang tải ảnh...</span>}
+                    <Button variant="secondary" onClick={() => { setShowProfileModal(false); logout(); }}>
+                        Đăng xuất
+                    </Button>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={showCreateModal}
+                onClose={() => setShowCreateModal(false)}
+                title="Tạo quán mới"
+            >
+                <div className="create-shop-form">
+                    <div className="form-group">
+                        <label>Tên quán *</label>
+                        <Input
+                            value={newShopName}
+                            onChange={(e) => setNewShopName(e.target.value)}
+                            placeholder="VD: Cafe ABC"
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label>Địa chỉ</label>
+                        <Input
+                            value={newShopAddress}
+                            onChange={(e) => setNewShopAddress(e.target.value)}
+                            placeholder="VD: 123 Đường ABC, Quận XYZ"
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label>Logo quán</label>
+                        <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleLogoChange}
+                            className="file-input"
+                        />
+                        {newShopLogo && (
+                            <p className="file-name">{newShopLogo.name}</p>
+                        )}
+                    </div>
+
+                    <div className="form-actions">
+                        <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
+                            Hủy
+                        </Button>
+                        <Button
+                            onClick={handleCreateShop}
+                            loading={creating}
+                            disabled={!newShopName.trim()}
+                        >
+                            Tạo quán
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
 
             {/* Footer */}
             <footer className="dashboard-footer">

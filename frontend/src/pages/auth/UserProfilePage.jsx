@@ -118,7 +118,7 @@ export function UserProfilePage() {
 
                 {/* Quick Links */}
                 <div className="profile-links">
-                    <Card className="link-card" onClick={() => navigate('/my-shops')}>
+                    <Card className="link-card" onClick={() => navigate('/dashboard')}>
                         <Store size={24} />
                         <span>Quán của tôi</span>
                     </Card>
