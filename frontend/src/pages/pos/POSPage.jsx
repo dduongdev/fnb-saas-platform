@@ -1045,6 +1045,12 @@ export function POSPage() {
                             <div className="add-item-info">
                                 <h4>{selectedProduct.name}</h4>
                                 <span className="add-item-price">{formatPrice(selectedProduct.price)}</span>
+                                {selectedProduct.description && (
+                                    <p className="add-item-description">{selectedProduct.description}</p>
+                                )}
+                                {selectedProduct.details && (
+                                    <small className="add-item-details">{selectedProduct.details}</small>
+                                )}
                             </div>
                         </div>
 
