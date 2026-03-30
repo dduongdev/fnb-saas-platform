@@ -1034,14 +1034,16 @@ export function POSPage() {
             >
                 {selectedProduct && (
                     <div className="add-item-modal-content">
-                        <div className="add-item-product">
-                            {selectedProduct.thumbnailUrl ? (
-                                <img src={selectedProduct.thumbnailUrl} alt={selectedProduct.name} className="add-item-image" />
-                            ) : (
-                                <div className="add-item-no-image">
-                                    <Coffee size={40} />
-                                </div>
-                            )}
+                        <div className="add-item-product add-item-product--detailed">
+                            <div className="add-item-image-wrap">
+                                {selectedProduct.thumbnailUrl ? (
+                                    <img src={selectedProduct.thumbnailUrl} alt={selectedProduct.name} className="add-item-image" />
+                                ) : (
+                                    <div className="add-item-no-image">
+                                        <Coffee size={40} />
+                                    </div>
+                                )}
+                            </div>
                             <div className="add-item-info">
                                 <h4>{selectedProduct.name}</h4>
                                 <span className="add-item-price">{formatPrice(selectedProduct.price)}</span>
