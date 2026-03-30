@@ -685,8 +685,15 @@ export function POSPage() {
                                             </div>
                                         )}
                                         <div className="pos-product-info">
-                                            <span className="pos-product-name">{product.name}</span>
-                                            <span className="pos-product-price">{formatPrice(product.price)}</span>
+                                            <div>
+                                                <span className="pos-product-name">{product.name}</span>
+                                                {product.description && (
+                                                    <span className="pos-product-description">{product.description}</span>
+                                                )}
+                                            </div>
+                                            <div className="pos-product-bottom">
+                                                <span className="pos-product-price">{formatPrice(product.price)}</span>
+                                            </div>
                                         </div>
                                         {addingItemId === product.id && (
                                             <div className="pos-product-adding-overlay">
