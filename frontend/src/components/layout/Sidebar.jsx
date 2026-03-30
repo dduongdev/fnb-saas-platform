@@ -84,9 +84,17 @@ export function Sidebar() {
                                     <li key={item.path}>
                                         <NavLink
                                             to={item.path}
+                                            end
                                             className={({ isActive }) =>
                                                 `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
                                             }
+                                            onMouseDown={(e) => {
+                                                // Prevent browser from assigning focus and auto-scrolling on click
+                                                e.preventDefault();
+                                            }}
+                                            onClick={(e) => {
+                                                e.currentTarget.blur();
+                                            }}
                                         >
                                             <item.icon size={20} />
                                             <span>{item.label}</span>
