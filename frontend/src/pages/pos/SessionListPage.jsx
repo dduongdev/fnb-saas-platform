@@ -407,9 +407,6 @@ export function SessionListPage() {
                 >
                     <Clock size={18} />
                     Lịch sử
-                    {historySessions.length > 0 && (
-                        <span className="tab-badge info">{historySessions.length}</span>
-                    )}
                 </button>
             </div>
 
@@ -427,19 +424,6 @@ export function SessionListPage() {
                 />
             ) : activeTab === 'history' ? (
                 <div>
-                    <div className="session-history-filters" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                        <label>Trạng thái:</label>
-                        <input
-                            type="text"
-                            value={historyFilterStatus}
-                            onChange={(e) => setHistoryFilterStatus(e.target.value.toUpperCase())}
-                            placeholder="ACTIVE, COMPLETED, CANCELLED, PENDING"
-                        />
-                        <Button onClick={() => { setHistoryPage(0); loadHistory(); }}>
-                            Lọc
-                        </Button>
-                    </div>
-
                     {historyLoading ? (
                         <Loading />
                     ) : (

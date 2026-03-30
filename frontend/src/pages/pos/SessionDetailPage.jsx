@@ -30,11 +30,6 @@ export function SessionDetailPage() {
   if (loading) return <Loading />;
   if (!session) return <Card>Không tìm thấy session</Card>;
 
-  const viewInPos = () => {
-    const tableId = session.tables?.[0]?.id;
-    navigate(`/pos${tableId ? `?table=${tableId}` : ''}`);
-  };
-
   return (
     <PageLayout title={`Chi tiết session #${sessionId}`}>
       <Card>
@@ -48,7 +43,6 @@ export function SessionDetailPage() {
               session.status === 'CANCELLED' ? 'danger' : 'default'
             } />
           </div>
-          <Button onClick={viewInPos} variant="primary">Mở trong POS</Button>
         </div>
 
         <div className="session-detail-grid">
@@ -56,7 +50,6 @@ export function SessionDetailPage() {
           <div className="detail-item"><strong>Bắt đầu:</strong> {session.startedAt ? new Date(session.startedAt).toLocaleString('vi-VN') : '-'}</div>
           <div className="detail-item"><strong>Kết thúc:</strong> {session.endedAt ? new Date(session.endedAt).toLocaleString('vi-VN') : '-'}</div>
           <div className="detail-item"><strong>Tổng:</strong> {session.totalAmount ? new Intl.NumberFormat('vi-VN').format(session.totalAmount) + 'đ' : '-'}</div>
-          <div className="detail-item detail-note"><strong>Ghi chú:</strong> {session.note || '-'}</div>
         </div>
 
         <h4>Orders</h4>

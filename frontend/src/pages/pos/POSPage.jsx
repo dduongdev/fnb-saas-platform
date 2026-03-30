@@ -253,6 +253,10 @@ export function POSPage() {
             toast.warning('Vui lòng chọn bàn trước');
             return;
         }
+        if (product.status === 'OUT_OF_STOCK') {
+            toast.error('Sản phẩm đã hết hàng, không thể thêm vào đơn');
+            return;
+        }
         if (!session) {
             toast.warning('Vui lòng mở bàn trước khi thêm món');
             setShowOpenTableModal(true);
@@ -551,9 +555,8 @@ export function POSPage() {
         return new Intl.NumberFormat('vi-VN').format(price) + 'đ';
     };
 
-    // Lọc bỏ món hết hàng (OUT_OF_STOCK)
-    const currentCategoryProducts = (menu.find(cat => cat.categoryId === selectedCategory)?.products || [])
-        .filter(product => product.status !== 'OUT_OF_STOCK');
+    // Hiển thị sản phẩm cả 'OUT_OF_STOCK' (không thể thêm vào đơn)
+    const currentCategoryProducts = (menu.find(cat => cat.categoryId === selectedCategory)?.products || []);
 
     // Lấy order chính từ session
     const currentOrder = session?.orders?.[0];
@@ -674,7 +677,7 @@ export function POSPage() {
                                 currentCategoryProducts.map(product => (
                                     <div
                                         key={product.id}
-                                        className={`pos-product-card ${addingItemId === product.id ? 'adding' : ''}`}
+                                        className={`pos-product-card ${addingItemId === product.id ? 'adding' : ''} ${product.status === 'OUT_OF_STOCK' ? 'out-of-stock' : ''}`}
                                         onClick={() => openAddItemModal(product)}
                                     >
                                         {product.thumbnailUrl ? (
@@ -693,6 +696,9 @@ export function POSPage() {
                                             </div>
                                             <div className="pos-product-bottom">
                                                 <span className="pos-product-price">{formatPrice(product.price)}</span>
+                                                <span className={`pos-product-status ${product.status === 'OUT_OF_STOCK' ? 'out' : 'in'}`}>
+                                                    {product.status === 'OUT_OF_STOCK' ? 'Hết hàng' : 'Còn hàng'}
+                                                </span>
                                             </div>
                                         </div>
                                         {addingItemId === product.id && (
