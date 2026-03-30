@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Layers } from 'lucide-react';
 import { PageLayout } from '../../components/layout';
+import { useToast } from '../../context/ToastContext';
 import { Button, Card, Loading, Empty, Modal, ModalFooter, Input } from '../../components/common';
 import { getCategories, createCategory, deleteCategory } from '../../api/menu';
 import './CategoryListPage.css';
 
 export function CategoryListPage() {
+    const toast = useToast();
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -39,7 +41,7 @@ export function CategoryListPage() {
             setShowCreateModal(false);
             setNewName('');
         } catch (error) {
-            alert(error.message);
+            toast.error(error.message);
         } finally {
             setCreateLoading(false);
         }
@@ -52,7 +54,7 @@ export function CategoryListPage() {
             await deleteCategory(category.id);
             await loadCategories();
         } catch (error) {
-            alert(error.message);
+            toast.error(error.message);
         }
     };
 

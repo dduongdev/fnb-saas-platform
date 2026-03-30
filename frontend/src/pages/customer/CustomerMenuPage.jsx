@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Loading, Button, Card, Empty, Input } from '../../components/common';
+import { useToast } from '../../context/ToastContext';
 import { getPublicMenu, getTableInfo } from '../../api/pos';
 import { getTenantDetail } from '../../api/tenant';
 import { createCustomerOrder, getCustomerOrderStatus, addCustomerItems, removeCustomerItem } from '../../api/session';
@@ -30,6 +31,7 @@ const withDefaultCategory = (categories) => {
 
 export function CustomerMenuPage() {
     const { tableId, tenantId } = useParams();
+    const toast = useToast();
     const isDemoMode = !tableId || tableId === 'demo';
     const [tableInfo, setTableInfo] = useState(null);
     const [categories, setCategories] = useState([]);
@@ -202,7 +204,7 @@ export function CustomerMenuPage() {
         setOrderView('menu');
         setCart([]); // Clear cart nếu có
         // Hiển thị thông báo cho customer
-        alert(data.message || 'Bàn đã được chuyển sang vị trí khác. Vui lòng quét QR để tiếp tục.');
+        toast.info(data.message || 'Bàn đã được chuyển sang vị trí khác. Vui lòng quét QR để tiếp tục.');
     }, []);
 
     // State to store effective tenantId from tableInfo
@@ -371,7 +373,7 @@ export function CustomerMenuPage() {
 
     const addToCart = (product) => {
         if (isDemoMode) {
-            alert('Đây là chế độ xem menu demo, không thể đặt hàng.');
+            toast.warning('Đây là chế độ xem menu demo, không thể đặt hàng.');
             return;
         }
 
@@ -448,10 +450,10 @@ export function CustomerMenuPage() {
 
             // Nếu lỗi do session đã tồn tại, reload để lấy session hiện tại
             if (error.message?.includes('đang có order chờ') || error.message?.includes('PENDING')) {
-                alert('Bàn này đang có đơn hàng chờ xác nhận. Đang tải đơn hàng...');
+                toast.info('Bàn này đang có đơn hàng chờ xác nhận. Đang tải đơn hàng...');
                 await reloadTableInfo();
             } else {
-                alert('Đặt món thất bại: ' + error.message);
+                toast.error('Đặt món thất bại: ' + error.message);
             }
         } finally {
             setSubmitting(false);
@@ -471,7 +473,7 @@ export function CustomerMenuPage() {
     // Remove item from session (only PENDING items)
     const handleRemoveItem = async (item) => {
         if (item.status !== 'PENDING') {
-            alert('Không thể xóa món đã mang ra');
+            toast.warning('Không thể xóa món đã mang ra');
             return;
         }
 
@@ -485,10 +487,10 @@ export function CustomerMenuPage() {
             // State will be updated via WebSocket event
         } catch (error) {
             if (error.status === 409) {
-                alert('Món đã được mang ra, không thể xóa');
+                toast.warning('Món đã được mang ra, không thể xóa');
                 await fetchCurrentOrder(session.sessionId); // Reload to sync
             } else {
-                alert(error.message);
+                toast.error(error.message);
             }
         } finally {
             setActionLoading(null);
@@ -517,7 +519,7 @@ export function CustomerMenuPage() {
 
             if (method.code === 'CASH') {
                 await requestPayment(session.sessionId || session.id, tenantId);
-                alert('Đã gửi yêu cầu thanh toán! Nhân viên sẽ đến ngay.');
+                toast.success('Đã gửi yêu cầu thanh toán! Nhân viên sẽ đến ngay.');
                 setShowPaymentModal(false);
             } else {
                 // Online Payment (VNPAY, MOMO)
@@ -535,7 +537,7 @@ export function CustomerMenuPage() {
             }
         } catch (error) {
             console.error('Payment error:', error);
-            alert('Lỗi: ' + (error.message || 'Không thể xử lý thanh toán'));
+            toast.error('Lỗi: ' + (error.message || 'Không thể xử lý thanh toán'));
         } finally {
             setProcessingPayment(false);
         }

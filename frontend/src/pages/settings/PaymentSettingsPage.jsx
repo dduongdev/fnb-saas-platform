@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CreditCard, Save } from 'lucide-react';
+import { useToast } from '../../context/ToastContext';
 import { PageLayout } from '../../components/layout';
 import { Button, Card, CardHeader, CardTitle, CardContent, Input, Loading } from '../../components/common';
 import { useAuth } from '../../context/AuthContext';
@@ -8,6 +9,7 @@ import { getTenantDetail, updatePaymentConfig } from '../../api/tenant';
 import './PaymentSettingsPage.css';
 
 export function PaymentSettingsPage() {
+    const toast = useToast();
     const { tenant, selectTenant } = useTenant();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -65,12 +67,12 @@ export function PaymentSettingsPage() {
         try {
             setSaving(true);
             await updatePaymentConfig(tenant.id, config);
-            alert('Đã lưu cấu hình thanh toán');
+            toast.success('Đã lưu cấu hình thanh toán');
             // Refresh tenant context
             await selectTenant(tenant.id);
         } catch (error) {
             console.error('Save failed:', error);
-            alert('Lỗi khi lưu cấu hình: ' + error.message);
+            toast.error('Lỗi khi lưu cấu hình: ' + error.message);
         } finally {
             setSaving(false);
         }
