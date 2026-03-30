@@ -171,10 +171,10 @@ export function NotificationsPage() {
 
     const headerActions = (
         <div className="header-actions">
-            <Button variant="ghost" onClick={() => loadNotifications(page, size)} title="Làm mới">
+            <Button variant="outline" onClick={() => loadNotifications(page, size)} title="Làm mới">
                 <RefreshCw size={18} />
             </Button>
-            <Button variant="outline" onClick={markAllRead} disabled={unreadCount === 0}>
+            <Button variant="ghost" onClick={markAllRead} disabled={unreadCount === 0}>
                 Đánh dấu tất cả đã đọc
             </Button>
         </div>
