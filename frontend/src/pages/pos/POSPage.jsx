@@ -249,20 +249,10 @@ export function POSPage() {
 
     // Mở modal chọn số lượng trước khi thêm món
     const openAddItemModal = (product) => {
-        if (!selectedTableId) {
-            toast.warning('Vui lòng chọn bàn trước');
-            return;
-        }
         if (product.status === 'OUT_OF_STOCK') {
             toast.error('Sản phẩm đã hết hàng, không thể thêm vào đơn');
             return;
         }
-        if (!session) {
-            toast.warning('Vui lòng mở bàn trước khi thêm món');
-            setShowOpenTableModal(true);
-            return;
-        }
-
         setSelectedProduct(product);
         setAddQuantity(1);
         setAddNote('');
@@ -271,6 +261,17 @@ export function POSPage() {
 
     // Thêm món - KHÔNG dùng optimistic update để tránh bug
     const handleAddItem = async () => {
+        if (!selectedTableId) {
+            toast.warning('Vui lòng chọn bàn trước');
+            return;
+        }
+
+        if (!session) {
+            toast.warning('Vui lòng mở bàn trước khi thêm món');
+            setShowOpenTableModal(true);
+            return;
+        }
+
         if (!selectedProduct || addQuantity < 1) return;
 
         try {
@@ -1163,7 +1164,7 @@ export function POSPage() {
             >
                 <div className="open-table-modal-content">
                     <p style={{ textAlign: 'center', color: 'var(--text-secondary)', margin: 'var(--space-4) 0' }}>
-                        Xác nhận mở bàn để bắt đầu phục vụ khách?
+                        Xác nhận mở phiên để bắt đầu phục vụ khách?
                     </p>
                 </div>
                 <ModalFooter>
@@ -1177,7 +1178,7 @@ export function POSPage() {
                         onClick={handleOpenTable}
                         loading={openTableLoading}
                     >
-                        Mở bàn
+                        Mở phiên
                     </Button>
                 </ModalFooter>
             </Modal>
