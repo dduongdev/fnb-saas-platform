@@ -46,7 +46,7 @@ export function PublicTenantListPage() {
                     {isAuthenticated ? (
                         <div style={{ display: 'flex', justifyContent: 'center', gap: 16, alignItems: 'center' }}>
                             <span>Xin chào, <strong>{user?.fullName}</strong></span>
-                            <Button size="sm" onClick={() => navigate('/my-shops')}>
+                            <Button size="sm" onClick={() => navigate('/dashboard')}>
                                 Quản lý quán
                             </Button>
                         </div>

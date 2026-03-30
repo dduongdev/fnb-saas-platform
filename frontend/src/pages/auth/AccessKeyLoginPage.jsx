@@ -6,7 +6,7 @@ import { useToast } from '../../context/ToastContext';
 
 import '../auth/LoginPage.css';
 
-export const WaitstaffLoginPage = () => {
+export const AccessKeyLoginPage = () => {
     const [accessKey, setAccessKey] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -28,7 +28,7 @@ export const WaitstaffLoginPage = () => {
             if (shops && shops.length > 0) {
                 toast.success('Đăng nhập thành công!');
                 // The page will reload so AuthContext picks up the new key and sets user
-                window.location.href = '/my-shops'; 
+                window.location.href = '/dashboard'; 
             } else {
                 localStorage.removeItem('pos_access_key');
                 toast.error('Access Key không hợp lệ hoặc hết hạn.');
@@ -50,8 +50,8 @@ export const WaitstaffLoginPage = () => {
                             <Shield size={28} style={{color:'#2b3896'}} />
                         </div>
                         <div>
-                            <h1 style={{margin:0}}>Indigo Ledger</h1>
-                            <p style={{margin:0,fontSize:13}}>Nhân viên điểm bán (POS)</p>
+                            <h1 style={{margin:0}}>Access Key Login</h1>
+                            <p style={{margin:0,fontSize:13}}>Nhân viên</p>
                         </div>
                     </div>
                 </div>

@@ -61,7 +61,7 @@ export function Sidebar() {
 
     const handleSwitchTenant = () => {
         clearTenant();
-        navigate('/my-shops');
+        navigate('/dashboard');
     };
 
     return (

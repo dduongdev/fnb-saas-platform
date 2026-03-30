@@ -70,7 +70,7 @@ export function LoginPage() {
           </button>
 
           <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', marginTop: 12 }}>
-            <button type="button" className="btn-secondary" onClick={() => navigate('/waiter-login')}>
+            <button type="button" className="btn-secondary" onClick={() => navigate('/access-key-login')}>
               Đăng nhập bằng Access Key (POS)
             </button>
             <button type="button" className="btn-ghost" onClick={() => navigate('/register')}>

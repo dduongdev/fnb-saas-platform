@@ -116,7 +116,7 @@ export function AuthProvider({ children }) {
         clearRefreshTimer();
         if (localStorage.getItem('pos_access_key')) {
             localStorage.removeItem('pos_access_key');
-            window.location.href = '/waiter-login';
+            window.location.href = '/access-key-login';
         } else {
             localStorage.removeItem('access_token');
             localStorage.removeItem('tenant_id');
