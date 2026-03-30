@@ -257,9 +257,6 @@
     color: var(--text-muted);
     font-size: var(--text-xs);
 }
-    padding-bottom: var(--space-3);
-    border-bottom: 1px solid var(--border);
-}
 
 .pos-order-items {
     flex: 1;
@@ -268,7 +265,6 @@
 
 .pos-order-item {
     display: grid;
-    grid-template-columns: 1fr auto auto;
     gap: var(--space-2);
     align-items: center;
     padding: var(--space-3) 0;
