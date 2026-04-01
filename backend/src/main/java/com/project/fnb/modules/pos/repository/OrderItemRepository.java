@@ -48,12 +48,16 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
      * @return Danh sách TopProductDto chứa (productId, productName, totalQuantity, totalRevenue)
      */
     @Query("SELECT new com.project.fnb.modules.reporting.dto.TopProductDto(" +
-            "oi.product.id, oi.product.name, SUM(oi.quantity), SUM(oi.price * oi.quantity)) " +
+            "oi.product.id, oi.product.name, " +
+            "SUM(CASE WHEN oi.status IN ('PENDING','SERVED') THEN oi.quantity ELSE 0 END), " +
+            "SUM(CASE WHEN oi.status IN ('PENDING','SERVED') THEN oi.price * oi.quantity ELSE 0 END), " +
+            "SUM(CASE WHEN oi.status = 'CANCELLED' THEN oi.quantity ELSE 0 END), " +
+            "SUM(CASE WHEN oi.status = 'CANCELLED' THEN oi.price * oi.quantity ELSE 0 END)) " +
             "FROM OrderItem oi " +
             "JOIN oi.order o " +
             "WHERE o.status = 'COMPLETED' " +
             "AND o.completedAt BETWEEN :start AND :end " +
             "GROUP BY oi.product.id, oi.product.name " +
-            "ORDER BY SUM(oi.quantity) DESC")
+            "ORDER BY SUM(CASE WHEN oi.status IN ('PENDING','SERVED') THEN oi.quantity ELSE 0 END) DESC")
     List<TopProductDto> findTopSellingProducts(LocalDateTime start, LocalDateTime end, Pageable pageable);
 }

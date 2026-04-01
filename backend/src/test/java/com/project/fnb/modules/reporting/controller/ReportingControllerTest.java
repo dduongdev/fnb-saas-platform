@@ -81,7 +81,7 @@ class ReportingControllerTest {
 
     @Test
     void getTopProducts_WithParams_ShouldReturnList() throws Exception {
-        TopProductDto dto = new TopProductDto(1L, "Phở Bò", 50L, BigDecimal.valueOf(2500000));
+        TopProductDto dto = new TopProductDto(1L, "Phở Bò", 50L, BigDecimal.valueOf(2500000), 2L, BigDecimal.valueOf(100000));
 
         when(reportingService.getTopSelling(any(LocalDate.class), any(LocalDate.class), anyInt()))
                 .thenReturn(List.of(dto));
@@ -94,7 +94,8 @@ class ReportingControllerTest {
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].productName").value("Phở Bò"))
-                .andExpect(jsonPath("$.data[0].quantitySold").value(50));
+                .andExpect(jsonPath("$.data[0].quantitySold").value(50))
+                .andExpect(jsonPath("$.data[0].quantityCancelled").value(2));
 
         verify(reportingService).getTopSelling(
                 LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31), 5);

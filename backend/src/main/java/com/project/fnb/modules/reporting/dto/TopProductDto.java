@@ -11,4 +11,6 @@ public class TopProductDto {
     private String productName;
     private Long quantitySold;
     private BigDecimal totalRevenue;
+    private Long quantityCancelled;
+    private BigDecimal cancelledRevenue;
 }

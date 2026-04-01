@@ -146,7 +146,9 @@ class ReportingServiceTest {
         LocalDate to = LocalDate.now();
         int limit = 5;
 
-        List<TopProductDto> mockedResult = List.of(mock(TopProductDto.class));
+        TopProductDto dto = new TopProductDto(1L, "Phở Bò", 50L,
+                BigDecimal.valueOf(2500000), 2L, BigDecimal.valueOf(100000));
+        List<TopProductDto> mockedResult = List.of(dto);
 
         when(orderItemRepository.findTopSellingProducts(
                 any(LocalDateTime.class),
@@ -157,6 +159,7 @@ class ReportingServiceTest {
         List<TopProductDto> result = reportingService.getTopSelling(from, to, limit);
 
         assertEquals(1, result.size());
+        assertEquals(2L, result.get(0).getQuantityCancelled());
         verify(orderItemRepository).findTopSellingProducts(
                 eq(from.atStartOfDay()),
                 any(LocalDateTime.class),
