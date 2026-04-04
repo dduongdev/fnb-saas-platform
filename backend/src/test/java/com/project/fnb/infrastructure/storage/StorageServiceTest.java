@@ -50,7 +50,7 @@ class StorageServiceTest {
     }
 
     @Test
-    void uploadTenantImage_ShouldUploadWithTenantBucket() {
+    void uploadTenantImage_ShouldUploadWithTenantBucket() throws Exception {
         TenantContext.setTenantId("SHOP-01");
         MockMultipartFile file = new MockMultipartFile("file", "photo.jpg", "image/jpeg", new byte[]{1, 2, 3});
 
@@ -62,14 +62,14 @@ class StorageServiceTest {
     }
 
     @Test
-    void deleteFile_ShouldCallMinio_WhenUrlValid() {
+    void deleteFile_ShouldCallMinio_WhenUrlValid() throws Exception {
         storageService.deleteFile("http://localhost:9000/user-profiles/avatars/a.png");
 
         verify(minioClient).removeObject(any());
     }
 
     @Test
-    void deleteFile_ShouldIgnore_WhenUrlBlank() {
+    void deleteFile_ShouldIgnore_WhenUrlBlank() throws Exception {
         storageService.deleteFile("  ");
 
         verify(minioClient, never()).removeObject(any());

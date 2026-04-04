@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { Loading, Button, Card, Empty, Input } from '../../components/common';
+import { Loading, Button } from '../../components/common';
 import { useToast } from '../../context/ToastContext';
 import { getPublicMenu, getTableInfo } from '../../api/pos';
 import { getTenantDetail } from '../../api/tenant';
@@ -15,18 +15,46 @@ console.log('[CustomerMenuPage] Component loaded, CSS should be imported');
 const OTHER_CATEGORY_ID = 'other';
 
 const withDefaultCategory = (categories) => {
-    const normalized = Array.isArray(categories) ? categories : [];
-    if (normalized.some(cat => cat.categoryId === OTHER_CATEGORY_ID)) {
-        return normalized;
-    }
-    return [
-        ...normalized,
-        {
+    const source = Array.isArray(categories) ? categories : [];
+    const cleaned = [];
+    const seenKeys = new Set();
+    let hasOther = false;
+
+    source.forEach((cat, index) => {
+        const idRaw = String(cat?.categoryId ?? '').trim();
+        const nameRaw = String(cat?.categoryName ?? '').trim();
+        const id = idRaw || `category-${index}`;
+        const name = nameRaw || 'Khác';
+        const normalizedName = name.toLowerCase();
+        const isOther = id === OTHER_CATEGORY_ID || normalizedName === 'khac' || normalizedName === 'khác';
+
+        if (isOther) {
+            hasOther = true;
+        }
+
+        const dedupeKey = `${id}|${normalizedName}`;
+        if (seenKeys.has(dedupeKey)) {
+            return;
+        }
+        seenKeys.add(dedupeKey);
+
+        cleaned.push({
+            ...cat,
+            categoryId: isOther ? OTHER_CATEGORY_ID : id,
+            categoryName: isOther ? 'Khác' : name,
+            products: Array.isArray(cat?.products) ? cat.products : [],
+        });
+    });
+
+    if (!hasOther) {
+        cleaned.push({
             categoryId: OTHER_CATEGORY_ID,
             categoryName: 'Khác',
             products: []
-        }
-    ];
+        });
+    }
+
+    return cleaned;
 };
 
 export function CustomerMenuPage() {
@@ -49,6 +77,9 @@ export function CustomerMenuPage() {
     // Product detail modal state
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [showProductModal, setShowProductModal] = useState(false);
+    const [productNote, setProductNote] = useState('');
+    const [productQty, setProductQty] = useState(1);
+    const [searchTerm, setSearchTerm] = useState('');
 
     // Order status tracking - using same structure as backend SessionResponse
     const [session, setSession] = useState(null); // Full session state from backend
@@ -363,48 +394,70 @@ export function CustomerMenuPage() {
 
     const openProductDetail = (product) => {
         setSelectedProduct(product);
+        setProductQty(1);
+        setProductNote('');
         setShowProductModal(true);
     };
 
     const closeProductDetail = () => {
         setSelectedProduct(null);
+        setProductQty(1);
+        setProductNote('');
         setShowProductModal(false);
     };
 
-    const addToCart = (product) => {
+    const addToCart = (product, options = {}) => {
         if (isDemoMode) {
             toast.warning('Đây là chế độ xem menu demo, không thể đặt hàng.');
             return;
         }
 
+        const quantity = Math.max(1, options.quantity || 1);
+        const note = (options.note || '').trim();
+
         setCart(prev => {
-            const existing = prev.find(item => item.productId === product.id);
+            const existing = prev.find(item => item.productId === product.id && (item.note || '') === note);
             if (existing) {
                 return prev.map(item =>
-                    item.productId === product.id
-                        ? { ...item, quantity: item.quantity + 1 }
+                    item.cartKey === existing.cartKey
+                        ? { ...item, quantity: item.quantity + quantity }
                         : item
                 );
             }
+
             return [...prev, {
+                cartKey: `${product.id}-${note}-${Date.now()}`,
                 productId: product.id,
                 productName: product.name,
                 price: product.price,
                 imageUrl: product.thumbnailUrl,
-                quantity: 1
+                quantity,
+                note,
             }];
         });
     };
 
-    const updateQuantity = (productId, delta) => {
+    const addSelectedProductToCart = () => {
+        if (!selectedProduct) {
+            return;
+        }
+        addToCart(selectedProduct, { quantity: productQty, note: productNote });
+        closeProductDetail();
+    };
+
+    const updateQuantity = (cartKey, delta) => {
         setCart(prev => {
             return prev.map(item => {
-                if (item.productId === productId) {
+                if (item.cartKey === cartKey) {
                     return { ...item, quantity: Math.max(0, item.quantity + delta) };
                 }
                 return item;
             }).filter(item => item.quantity > 0);
         });
+    };
+
+    const updateCartNote = (cartKey, note) => {
+        setCart(prev => prev.map(item => item.cartKey === cartKey ? { ...item, note } : item));
     };
 
     const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -418,7 +471,8 @@ export function CustomerMenuPage() {
 
             const items = cart.map(item => ({
                 productId: item.productId,
-                quantity: item.quantity
+                quantity: item.quantity,
+                note: item.note || null,
             }));
 
             // Reload table info để check session mới nhất
@@ -555,6 +609,20 @@ export function CustomerMenuPage() {
         });
     }
 
+    const activeCategoryData = categories.find(c => c.categoryId === activeCategory);
+    const visibleProducts = useMemo(() => {
+        const products = activeCategoryData?.products || [];
+        const keyword = searchTerm.trim().toLowerCase();
+        if (!keyword) {
+            return products;
+        }
+        return products.filter((p) => {
+            const name = String(p.name || '').toLowerCase();
+            const desc = String(p.description || '').toLowerCase();
+            return name.includes(keyword) || desc.includes(keyword);
+        });
+    }, [activeCategoryData?.products, searchTerm]);
+
     if (loading) {
         return (
             <div className="customer-loading">
@@ -572,6 +640,15 @@ export function CustomerMenuPage() {
                 <div className="shop-info">
                     <h1>{tableInfo?.tenantName || 'Menu quán'}</h1>
                     <p>{tableInfo?.tableName || `Bàn ${tableId}`}</p>
+                </div>
+                <div className="customer-header-search">
+                    <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Tìm món nhanh..."
+                        className="search-input"
+                    />
                 </div>
             </header>
 
@@ -641,7 +718,7 @@ export function CustomerMenuPage() {
 
             {/* Products Grid */}
             <main className="product-grid">
-                {(categories.find(c => c.categoryId === activeCategory)?.products || []).map(product => (
+                {visibleProducts.map(product => (
                     <div key={product.id} className="product-card" onClick={() => openProductDetail(product)}>
                         <div className="product-img">
                             {product.thumbnailUrl ? (
@@ -661,13 +738,17 @@ export function CustomerMenuPage() {
                             className="add-btn"
                             onClick={(e) => {
                                 e.stopPropagation();
-                                addToCart(product);
+                                addToCart(product, { quantity: 1, note: '' });
                             }}
                         >
                             +
                         </button>
                     </div>
                 ))}
+
+                {visibleProducts.length === 0 && (
+                    <div className="product-empty">Không tìm thấy món phù hợp</div>
+                )}
             </main>
 
             {/* Product Detail Modal */}
@@ -691,9 +772,26 @@ export function CustomerMenuPage() {
                             <h4>{selectedProduct.name}</h4>
                             <p className="detail-price">{formatPrice(selectedProduct.price)}</p>
                             <p className="detail-desc">{selectedProduct.description || 'Không có mô tả.'}</p>
+                            <div className="detail-qty-row">
+                                <span>Số lượng</span>
+                                <div className="qty-control">
+                                    <button type="button" onClick={() => setProductQty((q) => Math.max(1, q - 1))}>-</button>
+                                    <span>{productQty}</span>
+                                    <button type="button" onClick={() => setProductQty((q) => q + 1)}>+</button>
+                                </div>
+                            </div>
+                            <label className="note-label" htmlFor="product-note">Ghi chú cho bếp</label>
+                            <textarea
+                                id="product-note"
+                                className="note-input"
+                                rows="3"
+                                placeholder="Ví dụ: ít cay, không hành..."
+                                value={productNote}
+                                onChange={(e) => setProductNote(e.target.value)}
+                            />
                         </div>
                         <div className="product-detail-actions">
-                            <Button onClick={() => { addToCart(selectedProduct); closeProductDetail(); }}>
+                            <Button onClick={addSelectedProductToCart}>
                                 Thêm vào giỏ
                             </Button>
                             <Button variant="secondary" onClick={closeProductDetail}>
@@ -740,17 +838,24 @@ export function CustomerMenuPage() {
                                 <div className="cart-section">
                                     <h4 className="cart-section-title text-primary">Món mới (Chưa gửi)</h4>
                                     {cart.map(item => (
-                                        <div key={item.productId} className="cart-item">
+                                        <div key={item.cartKey} className="cart-item">
                                             <div className="item-info">
                                                 <h4>{item.productName}</h4>
                                                 <span className="item-price">{formatPrice(item.price)}</span>
+                                                <input
+                                                    className="cart-note-input"
+                                                    type="text"
+                                                    value={item.note || ''}
+                                                    onChange={(e) => updateCartNote(item.cartKey, e.target.value)}
+                                                    placeholder="Ghi chú (tuỳ chọn)"
+                                                />
                                             </div>
                                             <div className="qty-control">
-                                                <button onClick={() => updateQuantity(item.productId, -1)}>
+                                                <button onClick={() => updateQuantity(item.cartKey, -1)}>
                                                     -
                                                 </button>
                                                 <span>{item.quantity}</span>
-                                                <button onClick={() => updateQuantity(item.productId, 1)}>
+                                                <button onClick={() => updateQuantity(item.cartKey, 1)}>
                                                     +
                                                 </button>
                                             </div>
