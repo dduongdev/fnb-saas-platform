@@ -22,6 +22,7 @@ const menuItems = [
         section: 'Bán hàng',
         items: [
             { path: '/pos', icon: ShoppingCart, label: 'Bán hàng' },
+            { path: '/kds', icon: AppWindow, label: 'Màn hình bếp (KDS)' },
             { path: '/tables', icon: Grid, label: 'Sơ đồ bàn' },
             { path: '/sessions', icon: ClipboardList, label: 'Phiên phục vụ' },
             { path: '/notifications', icon: Bell, label: 'Thông báo' },

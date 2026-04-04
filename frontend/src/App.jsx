@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TenantProvider, useTenant } from './context/TenantContext';
 import { ToastProvider } from './context/ToastContext';
+import { KdsProvider } from './context/KdsContext';
 import { Loading } from './components/common';
 
 // Pages
@@ -25,6 +26,7 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { PublicTenantListPage } from './pages/auth/PublicTenantListPage';
 import { NotificationsPage } from './pages/notifications/NotificationsPage';
+import KdsPage from './pages/kds/KdsPage';
 
 import './styles/global.css';
 
@@ -70,6 +72,8 @@ function OwnerRoute({ children }) {
 }
 
 function AppRoutes() {
+  const { tenant } = useTenant();
+
   return (
     <Routes>
       {/* Public Routes */}
@@ -111,6 +115,18 @@ function AppRoutes() {
           <ProtectedRoute>
             <TenantRoute>
               <NotificationsPage />
+            </TenantRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/kds"
+        element={
+          <ProtectedRoute>
+            <TenantRoute>
+              <KdsProvider tenantId={tenant?.id}>
+                <KdsPage />
+              </KdsProvider>
             </TenantRoute>
           </ProtectedRoute>
         }

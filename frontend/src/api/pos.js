@@ -18,3 +18,6 @@ export const getPublicMenu = (tenantId) => {
 
 export const getTableInfo = (tableId) =>
     api.get(`/api/pos/public/info/${tableId}`, { skipTenant: true });
+
+// ==================== KDS (Kitchen Display System) ====================
+export const getKdsSessions = () => api.get('/api/pos/kds/sessions');
