@@ -26,7 +26,6 @@ public class KdsUpdatePayload {
      * Dữ liệu liên quan đến sự kiện.
      * - Nếu eventType = SESSION_CREATED hoặc SESSION_CANCELLED: null hoặc sessionId
      * - Nếu eventType = ITEM_ADDED/REMOVED/STATUS_CHANGED: KdsOrderItemDto hoặc sessionId
-     * - Nếu eventType = REFRESH: null (frontend sẽ reload toàn bộ)
      */
     private Object data;
     

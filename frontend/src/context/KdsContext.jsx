@@ -27,7 +27,6 @@ export const KDS_ACTIONS = {
   REMOVE_ITEM: 'REMOVE_ITEM',
   UPDATE_ITEM_STATUS: 'UPDATE_ITEM_STATUS',
   UPDATE_ITEM: 'UPDATE_ITEM',
-  REFRESH: 'REFRESH',
   SET_ERROR: 'SET_ERROR',
   CLEAR_ERROR: 'CLEAR_ERROR',
   SET_CONNECTED: 'SET_CONNECTED',
@@ -70,10 +69,26 @@ function kdsReducer(state, action) {
       };
 
     case KDS_ACTIONS.ADD_SESSION: {
-      const newSession = action.payload;
+      const incomingSessions = Array.isArray(action.payload)
+        ? action.payload.filter(Boolean)
+        : action.payload
+          ? [action.payload]
+          : [];
+
+      if (incomingSessions.length === 0) {
+        return state;
+      }
+
+      const sessionById = new Map(state.sessions.map((session) => [session.sessionId, session]));
+      incomingSessions.forEach((session) => {
+        sessionById.set(session.sessionId, session);
+      });
+
       return {
         ...state,
-        sessions: [newSession, ...state.sessions],
+        sessions: Array.from(sessionById.values()).sort(
+          (a, b) => new Date(b.sessionCreatedAt || 0) - new Date(a.sessionCreatedAt || 0)
+        ),
       };
     }
 
@@ -148,12 +163,6 @@ function kdsReducer(state, action) {
       };
     }
 
-    case KDS_ACTIONS.REFRESH:
-      return {
-        ...state,
-        sessions: action.payload || [],
-      };
-
     case KDS_ACTIONS.SET_ERROR:
       return {
         ...state,
@@ -184,14 +193,6 @@ export function KdsProvider({ children, tenantId, kitchenAreaId }) {
     console.log('Processing KDS event:', payload.eventType, payload);
 
     switch (payload.eventType) {
-      case 'REFRESH':
-        // payload.data should contain array of KdsSessionDto
-        dispatch({
-          type: KDS_ACTIONS.REFRESH,
-          payload: Array.isArray(payload.data) ? payload.data : [],
-        });
-        break;
-
       case 'SESSION_CREATED':
         dispatch({
           type: KDS_ACTIONS.ADD_SESSION,

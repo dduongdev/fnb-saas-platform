@@ -8,6 +8,7 @@ import com.project.fnb.modules.menu.repository.ProductRepository;
 import com.project.fnb.modules.pos.dto.*;
 import com.project.fnb.modules.pos.entity.*;
 import com.project.fnb.modules.pos.event.OrderPaidEvent;
+import com.project.fnb.modules.pos.event.KdsEventPublisher;
 import com.project.fnb.modules.pos.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -63,6 +64,7 @@ public class SessionService {
     private final TenantRepository tenantRepository;
     private final PosActionAuditService auditService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final KdsEventPublisher kdsEventPublisher;
     private final ApplicationEventPublisher eventPublisher;
     private final NotificationService notificationService;
 
@@ -145,6 +147,7 @@ public class SessionService {
         sendNotification("NEW_SESSION", table, "Bàn " + table.getName() + " vừa mở phiên mới");
         notifyTableUpdate();
         notifySessionUpdate(session); // Gửi đến customer đang subscribe table topic
+        kdsEventPublisher.publishSessionCreated(session, null);
 
         recordAction("session.open", "SESSION", String.valueOf(session.getId()), null,
                 "Mở session cho bàn " + table.getName(), session.getId());
@@ -244,6 +247,7 @@ public class SessionService {
 
             // Notify từng item đã thêm
             notifyItemEvent("ORDER_ITEM_ADDED", session, orderItem);
+            kdsEventPublisher.publishItemAdded(orderItem, session.getId(), null);
         }
 
         // Notify
@@ -310,6 +314,7 @@ public class SessionService {
 
         // Notify với event delete
         notifyDeleteEvent(session, itemId, order.getTotalAmount());
+        kdsEventPublisher.publishItemRemoved(itemId, sessionId, session.getTenantId(), null);
         sendNotification("REMOVE_ITEM", session.getPrimaryTable(),
                 "Bàn " + session.getTableNames() + " vừa xóa món");
 
@@ -355,6 +360,7 @@ public class SessionService {
 
         notifySessionUpdate(session);
         notifyTableUpdate();
+        kdsEventPublisher.publishSessionCreated(session, null);
         sendNotification("ATTACH_TABLE", session.getPrimaryTable(),
                 "Đã thêm bàn " + table.getName() + " vào session");
 
@@ -414,6 +420,7 @@ public class SessionService {
 
         notifySessionUpdate(session);
         notifyTableUpdate();
+        kdsEventPublisher.publishSessionCreated(session, null);
         sendNotification("DETACH_TABLE", session.getPrimaryTable(),
                 "Đã tách bàn " + table.getName() + " khỏi session");
 
@@ -482,6 +489,7 @@ public class SessionService {
 
         // Notify với event type cụ thể
         notifyItemEvent("ORDER_ITEM_UPDATED", session, item);
+        kdsEventPublisher.publishItemUpdated(item, sessionId, null);
         sendNotification("UPDATE_ITEM", session.getPrimaryTable(),
                 "Bàn " + session.getTableNames() + " vừa cập nhật số lượng món");
 
@@ -533,6 +541,7 @@ public class SessionService {
 
         // Notify với event type cụ thể
         notifyItemEvent("ORDER_ITEM_SERVED", session, item);
+        kdsEventPublisher.publishItemStatusChanged(item, sessionId, null);
         sendNotification("SERVE_ITEM", session.getPrimaryTable(),
                 "Bàn " + session.getTableNames() + ": Đã mang ra món " + item.getProduct().getName());
 
@@ -591,6 +600,7 @@ public class SessionService {
         // Notify
         notifyTableUpdate();
         notifySessionUpdate(session);
+        kdsEventPublisher.publishSessionCancelled(session.getId(), session.getTenantId(), null);
 
         // Publish event
         Order primaryOrder = session.getPrimaryOrder();
@@ -651,6 +661,7 @@ public class SessionService {
 
         notifyTableUpdate();
         notifySessionUpdate(session);
+        kdsEventPublisher.publishSessionCancelled(session.getId(), session.getTenantId(), null);
 
         recordAction("session.cancel", "SESSION", String.valueOf(session.getId()), null,
                 "Hủy session: " + (request.getReason() != null ? request.getReason() : "Không có lý do"), session.getId());
@@ -768,6 +779,8 @@ public class SessionService {
         sendNotification("NEW_ITEM", table,
                 "Bàn " + session.getTableNames() + " vừa gọi thêm món (từ khách)");
         notifySessionUpdate(session);
+        // Customer flow adds items through a different path; send full session snapshot via upsert event.
+        kdsEventPublisher.publishSessionCreated(session, null);
 
         return buildCustomerOrderResponse(session);
     }
@@ -861,6 +874,7 @@ public class SessionService {
         notifyTableUpdate();
         notifySessionUpdate(session);
         notifyPendingSessionUpdate();
+        kdsEventPublisher.publishSessionCreated(session, null);
         sendNotification("SESSION_CONFIRMED", session.getPrimaryTable(),
                 "✅ Order bàn " + session.getTableNames() + " đã được xác nhận");
 
@@ -922,6 +936,7 @@ public class SessionService {
         notifyTableUpdate();
         notifySessionUpdate(session);
         notifyPendingSessionUpdate();
+        kdsEventPublisher.publishSessionCancelled(session.getId(), session.getTenantId(), null);
         sendNotification("SESSION_REJECTED", session.getPrimaryTable(),
                 "❌ Order bàn " + session.getTableNames() + " đã bị từ chối");
 

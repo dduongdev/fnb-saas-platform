@@ -51,7 +51,7 @@ class KdsWebSocketControllerTest {
         assertInstanceOf(KdsUpdatePayload.class, payloadCaptor.getValue());
 
         KdsUpdatePayload payload = (KdsUpdatePayload) payloadCaptor.getValue();
-        assertEquals(KdsEventType.REFRESH, payload.getEventType());
+        assertEquals(KdsEventType.SESSION_CREATED, payload.getEventType());
         assertEquals(1, ((List<?>) payload.getData()).size());
         assertNotNull(payload.getTimestamp());
         assertNull(TenantContext.getTenantId());

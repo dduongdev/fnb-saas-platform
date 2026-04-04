@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.ArrayList;
 import com.project.fnb.modules.pos.entity.Order;
 import com.project.fnb.modules.pos.entity.Notification;
+import com.project.fnb.modules.pos.event.KdsEventPublisher;
 import com.project.fnb.modules.pos.repository.SessionRepository;
 import com.project.fnb.modules.pos.repository.TableRepository;
 import com.project.fnb.modules.pos.repository.OrderRepository;
@@ -67,6 +68,9 @@ class SessionServiceTest {
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private KdsEventPublisher kdsEventPublisher;
 
     @InjectMocks
     private SessionService sessionService;
@@ -380,6 +384,7 @@ class SessionServiceTest {
         sessionService.addItems(1L, request);
 
         verify(orderRepository).save(order);
+        verify(kdsEventPublisher).publishItemAdded(any(OrderItem.class), eq(1L), isNull());
         assertEquals(BigDecimal.valueOf(20), order.getTotalAmount());
         verify(notificationService, org.mockito.Mockito.atLeastOnce()).createAndSend(any(), any(), any(), any(com.project.fnb.modules.pos.entity.Notification.Priority.class), any(), any());
     }
@@ -444,6 +449,7 @@ class SessionServiceTest {
 
         assertEquals(ServingSession.SessionStatus.ACTIVE, result.getStatus());
         assertEquals(DiningTable.Status.OCCUPIED, table.getStatus());
+        verify(kdsEventPublisher).publishSessionCreated(session, null);
         verify(tableRepository, org.mockito.Mockito.atLeastOnce()).save(any());
         verify(sessionRepository).save(session);
     }
@@ -466,6 +472,7 @@ class SessionServiceTest {
         assertEquals(ServingSession.SessionStatus.CANCELLED, session.getStatus());
         assertNull(table.getCurrentSession());
         assertEquals(DiningTable.Status.AVAILABLE, table.getStatus());
+        verify(kdsEventPublisher).publishSessionCancelled(1L, session.getTenantId(), null);
         verify(sessionRepository).save(session);
     }
 
@@ -505,6 +512,7 @@ class SessionServiceTest {
         com.project.fnb.modules.pos.dto.CustomerOrderResponse res = sessionService.addCustomerItems(1L, req);
 
         assertNotNull(res);
+        verify(kdsEventPublisher).publishSessionCreated(session, null);
         verify(orderRepository).save(order);
         assertEquals(BigDecimal.valueOf(100), order.getTotalAmount());
     }

@@ -96,7 +96,7 @@ public class KdsWebSocketController {
             
             // Tạo payload chứa toàn bộ danh sách sessions
             KdsUpdatePayload payload = KdsUpdatePayload.builder()
-                    .eventType(com.project.fnb.modules.pos.dto.KdsEventType.REFRESH)
+                    .eventType(com.project.fnb.modules.pos.dto.KdsEventType.SESSION_CREATED)
                     .data(sessions)  // Send list of all active sessions
                     .timestamp(System.currentTimeMillis())
                     .build();

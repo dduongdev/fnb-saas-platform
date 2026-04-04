@@ -32,7 +32,6 @@ import java.util.List;
  *   <li>ITEM_ADDED: Thêm OrderItem → frontend thêm card vào cột</li>
  *   <li>ITEM_REMOVED: Xóa OrderItem → frontend xóa card khỏi cột</li>
  *   <li>ITEM_STATUS_CHANGED: Item status thay đổi (PENDING→SERVED) → frontend sắp xếp lại</li>
- *   <li>REFRESH: Refresh toàn bộ danh sách → frontend reload all data</li>
  * </ul>
  * 
  * <p><b>Topic Structure:</b></p>
@@ -213,30 +212,6 @@ public class KdsEventPublisher {
             log.info("Published ITEM_UPDATED event for item {}", item.getId());
         } catch (Exception e) {
             log.error("Error publishing ITEM_UPDATED event", e);
-        }
-    }
-    
-    /**
-     * Publish REFRESH event để frontend reload toàn bộ data.
-     * 
-     * <p><b>Use Case:</b> Khi có lỗi desync hoặc quá nhiều thay đổi.</p>
-     * 
-     * @param tenantId Tenant ID
-     * @param kitchenAreaId ID của kitchen area
-     */
-    public void publishRefresh(String tenantId, String kitchenAreaId) {
-        try {
-            KdsUpdatePayload payload = KdsUpdatePayload.builder()
-                    .eventType(KdsEventType.REFRESH)
-                    .timestamp(System.currentTimeMillis())
-                    .build();
-            
-            String destination = buildTopicDestination(tenantId, kitchenAreaId);
-            messagingTemplate.convertAndSend(destination, payload);
-            
-            log.info("Published REFRESH event to {}", destination);
-        } catch (Exception e) {
-            log.error("Error publishing REFRESH event", e);
         }
     }
     

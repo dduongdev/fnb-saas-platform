@@ -537,8 +537,10 @@ export function CustomerMenuPage() {
 
         try {
             setActionLoading(item.id);
-            await removeCustomerItem(session.sessionId, item.id);
-            // State will be updated via WebSocket event
+            const currentSessionId = session?.sessionId || session?.id;
+            await removeCustomerItem(currentSessionId, item.id);
+            // Keep UI consistent even if WebSocket event is delayed/lost.
+            await fetchCurrentOrder(currentSessionId);
         } catch (error) {
             if (error.status === 409) {
                 toast.warning('Món đã được mang ra, không thể xóa');

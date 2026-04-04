@@ -2,6 +2,7 @@ package com.project.fnb.modules.pos.event;
 
 import com.project.fnb.modules.pos.dto.KdsEventType;
 import com.project.fnb.modules.pos.dto.KdsOrderItemDto;
+import com.project.fnb.modules.pos.dto.KdsSessionDto;
 import com.project.fnb.modules.pos.dto.KdsUpdatePayload;
 import com.project.fnb.modules.pos.entity.OrderItem;
 import com.project.fnb.modules.pos.entity.ServingSession;
@@ -16,10 +17,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class KdsEventPublisherTest {
@@ -34,18 +37,25 @@ class KdsEventPublisherTest {
     private KdsEventPublisher eventPublisher;
 
     @Test
-    void publishRefresh_ShouldSendRefreshPayloadToCorrectTopic() {
+    void publishSessionCreated_ShouldSendSessionSnapshotToCorrectTopic() {
+        ServingSession session = new ServingSession();
+        session.setId(10L);
+        session.setTenantId("tenant-1");
+
+        KdsSessionDto dto = KdsSessionDto.builder().sessionId(10L).tableNames("Bàn 1").build();
+        when(kdsService.getAllActiveSessions()).thenReturn(List.of(dto));
+
         ArgumentCaptor<KdsUpdatePayload> payloadCaptor = ArgumentCaptor.forClass(KdsUpdatePayload.class);
 
-        eventPublisher.publishRefresh("tenant-1", "kitchenX");
+        eventPublisher.publishSessionCreated(session, "kitchenX");
 
         verify(messagingTemplate).convertAndSend(eq("/topic/kds/tenant-1/kitchenX"), payloadCaptor.capture());
         KdsUpdatePayload payload = payloadCaptor.getValue();
 
         assertNotNull(payload);
-        assertEquals(KdsEventType.REFRESH, payload.getEventType());
-        assertNull(payload.getData());
-        assertNull(payload.getSessionId());
+        assertEquals(KdsEventType.SESSION_CREATED, payload.getEventType());
+        assertEquals(dto, payload.getData());
+        assertEquals(10L, payload.getSessionId());
         assertNotNull(payload.getTimestamp());
     }
 
