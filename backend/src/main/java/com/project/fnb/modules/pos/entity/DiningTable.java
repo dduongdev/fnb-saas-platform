@@ -40,7 +40,12 @@ import org.hibernate.annotations.SQLRestriction;
  * @see ServingSession
  */
 @Entity
-@Table(name = "dining_tables")
+@Table(
+    name = "dining_tables",
+    indexes = {
+        @Index(name = "idx_table_current_session", columnList = "current_session_id")
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor

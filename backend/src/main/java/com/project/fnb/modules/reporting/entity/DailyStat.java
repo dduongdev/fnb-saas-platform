@@ -9,9 +9,15 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "daily_stats", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"tenant_id", "report_date"})
-})
+@Table(
+    name = "daily_stats",
+    uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"tenant_id", "report_date"})
+    },
+    indexes = {
+        @Index(name = "idx_dailystat_tenant_date", columnList = "tenant_id, report_date")
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor

@@ -39,7 +39,15 @@ import java.time.LocalDateTime;
  * @version 1.0
  */
 @Entity
-@Table(name = "notifications")
+@Table(
+    name = "notifications",
+    indexes = {
+        @Index(name = "idx_notification_is_read", columnList = "is_read"),
+        @Index(name = "idx_notification_tenant_read_date", columnList = "tenant_id, is_read, created_at DESC"),
+        @Index(name = "idx_notification_type_date", columnList = "tenant_id, type, created_at DESC"),
+        @Index(name = "idx_notification_priority_date", columnList = "tenant_id, priority, created_at DESC")
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor

@@ -12,7 +12,12 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
 @Entity
-@Table(name = "products")
+@Table(
+    name = "products",
+    indexes = {
+        @Index(name = "idx_product_category_status", columnList = "category_id, status")
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor

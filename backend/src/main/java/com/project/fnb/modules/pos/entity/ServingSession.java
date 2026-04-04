@@ -57,7 +57,12 @@ import java.util.stream.Collectors;
  * </p>
  */
 @Entity
-@Table(name = "serving_sessions")
+@Table(
+    name = "serving_sessions",
+    indexes = {
+        @Index(name = "idx_session_tenant_status", columnList = "tenant_id, status")
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor

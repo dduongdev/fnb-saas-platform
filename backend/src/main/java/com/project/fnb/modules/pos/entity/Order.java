@@ -43,7 +43,13 @@ import java.util.Set;
  * @see OrderItem
  */
 @Entity
-@Table(name = "orders")
+@Table(
+    name = "orders",
+    indexes = {
+        @Index(name = "idx_order_session_id", columnList = "session_id"),
+        @Index(name = "idx_order_completed_status", columnList = "completed_at, status")
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor

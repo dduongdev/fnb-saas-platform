@@ -10,7 +10,13 @@ import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "payment_transactions")
+@Table(
+    name = "payment_transactions",
+    indexes = {
+        @Index(name = "idx_payment_status_date", columnList = "status, created_at"),
+        @Index(name = "idx_payment_order_id", columnList = "order_id")
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor

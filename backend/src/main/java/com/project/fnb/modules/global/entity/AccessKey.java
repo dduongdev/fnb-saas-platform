@@ -7,7 +7,13 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "access_keys")
+@Table(
+    name = "access_keys",
+    indexes = {
+        @Index(name = "idx_accesskey_string", columnList = "key_string", unique = true),
+        @Index(name = "idx_accesskey_tenant_active", columnList = "tenant_id, is_active")
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor

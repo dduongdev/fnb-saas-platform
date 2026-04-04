@@ -37,7 +37,12 @@ import java.math.BigDecimal;
  * @see DiningTable
  */
 @Entity
-@Table(name = "order_items")
+@Table(
+    name = "order_items",
+    indexes = {
+        @Index(name = "idx_orderitem_order_status", columnList = "order_id, status")
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor
