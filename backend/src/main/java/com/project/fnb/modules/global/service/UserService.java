@@ -14,7 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
  * Dịch vụ quản lý thông tin người dùng trong hệ thống.
  * 
  * <p>Class này cung cấp các chức năng liên quan đến xử lý dữ liệu người dùng,
- * bao gồm đồng bộ thông tin người dùng từ JWT token (thường được cấp bởi OAuth2/Keycloak).
+ * bao gồm đồng bộ thông tin người dùng từ JWT token nội bộ của hệ thống.
  * Dịch vụ tự động tạo mới người dùng nếu chưa tồn tại hoặc cập nhật thông tin
  * nếu người dùng đã tồn tại trong hệ thống.</p>
  * 

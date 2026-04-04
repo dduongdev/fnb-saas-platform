@@ -41,7 +41,7 @@ public class TenantController {
      * User sẽ đự lệnh làm owner (chủ nhân) của quán.
      * Đồng thời có thể upload logo quán lên cloud storage (optional).</p>
      * 
-     * @param jwt JWT token từ Keycloak, chứa user ID trong claim "sub"
+    * @param jwt JWT token, chứa user ID trong claim "sub"
      * @param name Tên quán hàng (bắt buộc)
      * @param address Địa chỉ quán hàng (bắt buộc)
      * @param logo File hình ảnh logo quán (optional, multipart)
@@ -73,7 +73,7 @@ public class TenantController {
      * Các tham số không bắt buộc, chỉ cập nhật những giá trị được cung cấp (partial update).</p>
      * 
      * @param id ID của tenant cần cập nhật (path parameter, bắt buộc)
-     * @param jwt JWT token từ Keycloak, dùng để authorization
+    * @param jwt JWT token dùng để authorization
      * @param name Tên quán hàng mới (optional)
      * @param address Địa chỉ quán hàng mới (optional)
      * @param logo File hình ảnh logo mới (optional)
@@ -106,7 +106,7 @@ public class TenantController {
      * <p>Endpoint này trả về tất cả tenant mà user hiện tại là owner (chủ nhân).
      * Danh sách được lấy từ JWT token để xác định user ID.</p>
      * 
-     * @param jwt JWT token từ Keycloak, chứa user ID trong claim "sub"
+    * @param jwt JWT token, chứa user ID trong claim "sub"
      * 
      * @return ApiResponse<List<Tenant>> danh sách tất cả tenant của user
      * @see TenantService#getMyTenants(String)

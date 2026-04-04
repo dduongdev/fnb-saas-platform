@@ -36,13 +36,6 @@ spring:
     username: ${RABBITMQ_USER}
     password: ${RABBITMQ_PASS}
 
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER_URI}
-          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI}
-
 app:
   jwt:
     secret: ${APP_JWT_SECRET:ZmFrZV9zZWNyZXRfZm9yX2RldmVsb3BtZW50X2VuY29kaW5nMTIzNA==}

@@ -11,12 +11,6 @@ spring:
     port: 5672
     username: guest
     password: ""
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: "http://localhost:8080/realms/fnb"
-          jwk-set-uri: "http://localhost:8080/realms/fnb/protocol/openid-connect/certs"
 
 app:
   security:
