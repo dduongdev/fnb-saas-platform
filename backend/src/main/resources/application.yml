@@ -6,7 +6,7 @@ spring:
     name: fnb-platform
 
   jackson:
-    time-zone: Asia/Ho_Chi_Minh
+    time-zone: UTC
     date-format: yyyy-MM-dd'T'HH:mm:ss
 
   # File upload

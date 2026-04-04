@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageLayout } from '../../components/layout';
 import { Card, Button, Loading, Input } from '../../components/common';
 import { getSessionHistory, getSession } from '../../api/session';
+import { formatDateTime } from '../../utils/format';
 import './SessionListPage.css';
 
 export function SessionHistoryPage() {
@@ -86,8 +87,8 @@ export function SessionHistoryPage() {
                       <td>{item.sessionId}</td>
                       <td>{item.status}</td>
                       <td>{item.tables?.map(t => t.name).join(', ') || '-'}</td>
-                      <td>{item.startedAt ? new Date(item.startedAt).toLocaleString('vi-VN') : '-'}</td>
-                      <td>{item.endedAt ? new Date(item.endedAt).toLocaleString('vi-VN') : '-'}</td>
+                      <td>{item.startedAt ? formatDateTime(item.startedAt) : '-'}</td>
+                      <td>{item.endedAt ? formatDateTime(item.endedAt) : '-'}</td>
                       <td>{item.totalAmount ? new Intl.NumberFormat('vi-VN').format(item.totalAmount) + 'đ' : '-'}</td>
                       <td>
                         <Button size="sm" variant="primary" onClick={() => openSession(item.sessionId)}>

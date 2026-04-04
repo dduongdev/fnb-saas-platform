@@ -5,6 +5,7 @@ import { PageLayout } from '../../components/layout';
 import { Card, Input, Button, Loading } from '../../components/common';
 import { getPosActionAudit } from '../../api/tenant';
 import { getSession } from '../../api/session';
+import { formatDateTime } from '../../utils/format';
 import './PosAuditPage.css';
 
 export function PosAuditPage() {
@@ -141,7 +142,7 @@ export function PosAuditPage() {
 
                                         return (
                                             <tr key={record.id}>
-                                                <td>{new Date(record.createdAt).toLocaleString('vi-VN')}</td>
+                                                <td>{formatDateTime(record.createdAt)}</td>
                                                 <td>{record.action}</td>
                                                 <td>{userDisplay}</td>
                                                 <td>{roleDisplay}</td>

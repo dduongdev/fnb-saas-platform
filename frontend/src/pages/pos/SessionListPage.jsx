@@ -17,7 +17,7 @@ import {
     detachTable
 } from '../../api/session';
 import { getTables } from '../../api/pos';
-import { formatPrice } from '../../utils/format';
+import { formatDateTime, formatPrice } from '../../utils/format';
 import './SessionListPage.css';
 
 export function SessionListPage() {
@@ -311,7 +311,11 @@ export function SessionListPage() {
     const formatTime = (dateStr) => {
         if (!dateStr) return '--:--';
         const date = new Date(dateStr);
-        return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+        return date.toLocaleTimeString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
     };
 
     const formatDuration = (startDateStr) => {
@@ -491,8 +495,8 @@ export function SessionListPage() {
                                                     <td>{item.sessionId}</td>
                                                     <td className="status-cell">{item.status}</td>
                                                     <td>{item.tables?.map(t => t.name).join(', ') || '-'}</td>
-                                                    <td>{item.startedAt ? new Date(item.startedAt).toLocaleString('vi-VN') : '-'}</td>
-                                                    <td>{item.endedAt ? new Date(item.endedAt).toLocaleString('vi-VN') : '-'}</td>
+                                                    <td>{item.startedAt ? formatDateTime(item.startedAt) : '-'}</td>
+                                                    <td>{item.endedAt ? formatDateTime(item.endedAt) : '-'}</td>
                                                     <td>{item.totalAmount ? new Intl.NumberFormat('vi-VN').format(item.totalAmount) + 'đ' : '-'}</td>
                                                     <td>
                                                         <Button size="sm" variant="primary" onClick={() => navigate(`/sessions/${item.sessionId}`)}>Xem</Button>

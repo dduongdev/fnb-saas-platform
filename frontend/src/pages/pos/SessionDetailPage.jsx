@@ -4,6 +4,7 @@ import { PageLayout } from '../../components/layout';
 import { Card, Button, Loading, StatusBadge } from '../../components/common';
 import { useToast } from '../../context/ToastContext';
 import { getSession } from '../../api/session';
+import { formatDateTime } from '../../utils/format';
 
 export function SessionDetailPage() {
   const { sessionId } = useParams();
@@ -47,8 +48,8 @@ export function SessionDetailPage() {
 
         <div className="session-detail-grid">
           <div className="detail-item"><strong>Bàn:</strong> {session.tables?.map(t => t.name).join(', ') || '-'}</div>
-          <div className="detail-item"><strong>Bắt đầu:</strong> {session.startedAt ? new Date(session.startedAt).toLocaleString('vi-VN') : '-'}</div>
-          <div className="detail-item"><strong>Kết thúc:</strong> {session.endedAt ? new Date(session.endedAt).toLocaleString('vi-VN') : '-'}</div>
+          <div className="detail-item"><strong>Bắt đầu:</strong> {session.startedAt ? formatDateTime(session.startedAt) : '-'}</div>
+          <div className="detail-item"><strong>Kết thúc:</strong> {session.endedAt ? formatDateTime(session.endedAt) : '-'}</div>
           <div className="detail-item"><strong>Tổng:</strong> {session.totalAmount ? new Intl.NumberFormat('vi-VN').format(session.totalAmount) + 'đ' : '-'}</div>
         </div>
 

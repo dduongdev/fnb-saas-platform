@@ -20,6 +20,7 @@ import {
     rejectSession
 } from '../../api/session';
 import { useSessionWebSocket, useSessionByIdWebSocket, usePendingSessionsWebSocket, useMultipleSessionsWebSocket } from '../../hooks/useWebSocket';
+import { formatTime } from '../../utils/format';
 import './POSPage.css';
 import clsx from 'clsx';
 
@@ -776,7 +777,7 @@ export function POSPage() {
                                                             {item.createdAt && (
                                                                 <span className="pos-order-item-time">
                                                                     <Clock size={12} />
-                                                                    {new Date(item.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                                                    {formatTime(item.createdAt)}
                                                                 </span>
                                                             )}
                                                         </div>
