@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TenantProvider, useTenant } from './context/TenantContext';
 import { ToastProvider } from './context/ToastContext';
@@ -31,15 +31,19 @@ import KdsPage from './pages/kds/KdsPage';
 import './styles/global.css';
 
 function ProtectedRoute({ children }) {
-  const { isAuthenticated, loading, initialized } = useAuth();
+  const { isAuthenticated, loading, initialized, isKitchen } = useAuth();
+  const location = useLocation();
 
   if (!initialized || loading) {
     return <Loading fullPage text="Đang xác thực..." />;
   }
 
   if (!isAuthenticated) {
-    // Redirect unauthenticated users to the custom login page
     return <Navigate to="/login" replace />;
+  }
+
+  if (isKitchen && location.pathname !== '/kds') {
+    return <Navigate to="/kds" replace />;
   }
 
   return children;
@@ -48,12 +52,16 @@ function ProtectedRoute({ children }) {
 // Tenant Required Route wrapper
 function TenantRoute({ children }) {
   const { tenant, loading } = useTenant();
+  const { isKitchen } = useAuth();
 
   if (loading) {
     return <Loading fullPage text="Đang tải..." />;
   }
 
   if (!tenant) {
+    if (isKitchen) {
+      return <Loading fullPage text="Đang tải dữ liệu bếp..." />;
+    }
     return <Navigate to="/dashboard" replace />;
   }
 

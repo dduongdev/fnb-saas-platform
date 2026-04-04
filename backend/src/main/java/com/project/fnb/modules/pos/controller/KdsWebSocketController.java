@@ -76,6 +76,11 @@ public class KdsWebSocketController {
      * @param kitchenAreaId     Kitchen Area ID (tùy chọn)
      */
     @MessageMapping("/kds/subscribe/{tenantId}/{kitchenAreaId}")
+    @com.project.fnb.aspect.RequirePermission({
+            com.project.fnb.aspect.OwnerPermissionValidator.class,
+            com.project.fnb.aspect.KitchenPermissionValidator.class,
+            com.project.fnb.aspect.WaiterPermissionValidator.class
+    })
     public void handleSubscribe(
             @DestinationVariable String tenantId,
             @DestinationVariable String kitchenAreaId) {

@@ -16,3 +16,8 @@ export const loginWithCredentials = (credentials) => {
 export const registerUser = (payload) => {
     return api.post('/api/auth/register', payload, { skipTenant: true });
 };
+
+// Get current access key info
+export const getAccessKeyInfo = () => {
+    return api.get('/api/auth/access-key-info', { skipTenant: true });
+};

@@ -1,5 +1,5 @@
 ﻿import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { loginWithCredentials } from '../api/auth';
+import { loginWithCredentials, getAccessKeyInfo } from '../api/auth';
 
 const AuthContext = createContext(null);
 
@@ -8,6 +8,7 @@ export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [initialized, setInitialized] = useState(false);
+    const [accessKeyRole, setAccessKeyRole] = useState(localStorage.getItem('pos_access_key_role'));
     const refreshTimerRef = useRef(null);
 
     const parseJwt = (token) => {
@@ -57,7 +58,12 @@ export function AuthProvider({ children }) {
     useEffect(() => {
         const initialize = async () => {
             const storedToken = localStorage.getItem('access_token');
+            const accessKey = localStorage.getItem('pos_access_key');
+
             if (storedToken) {
+                localStorage.removeItem('pos_access_key');
+                localStorage.removeItem('pos_access_key_role');
+
                 scheduleRefresh(storedToken);
                 const parsed = parseJwt(storedToken);
                 if (parsed) {
@@ -68,7 +74,17 @@ export function AuthProvider({ children }) {
                         fullName: parsed.name,
                     });
                 }
+            } else if (accessKey) {
+                try {
+                    const info = await getAccessKeyInfo();
+                    localStorage.setItem('pos_access_key_role', info.role);
+                    setAccessKeyRole(info.role);
+                } catch (error) {
+                    localStorage.removeItem('pos_access_key');
+                    localStorage.removeItem('pos_access_key_role');
+                }
             }
+
             setInitialized(true);
             setLoading(false);
         };
@@ -85,6 +101,10 @@ export function AuthProvider({ children }) {
         if (!data?.accessToken) {
             throw new Error('Login failed');
         }
+
+        localStorage.removeItem('pos_access_key_role');
+        localStorage.removeItem('pos_access_key');
+        setAccessKeyRole(null);
 
         localStorage.setItem('access_token', data.accessToken);
         scheduleRefresh(data.accessToken);
@@ -111,9 +131,11 @@ export function AuthProvider({ children }) {
     const isWaitstaff = !!localStorage.getItem('pos_access_key');
     const hasToken = !!localStorage.getItem('access_token');
     const isAuthenticated = (hasToken || isWaitstaff) ?? false;
+    const isKitchen = isWaitstaff && accessKeyRole === 'KITCHEN';
 
     const handleLogout = useCallback(() => {
         clearRefreshTimer();
+        localStorage.removeItem('pos_access_key_role');
         if (localStorage.getItem('pos_access_key')) {
             localStorage.removeItem('pos_access_key');
             window.location.href = '/access-key-login';
@@ -126,10 +148,11 @@ export function AuthProvider({ children }) {
     }, [clearRefreshTimer]);
 
     const value = {
-        user: user || (isWaitstaff ? { name: 'Nhân viên POS', isWaitstaff: true } : null),
+        user: user || (isWaitstaff ? { name: 'Nhân viên POS', isWaitstaff: true, accessKeyRole } : null),
         loading,
         initialized,
         isAuthenticated,
+        isKitchen,
         login,
         directLogin,
         logout: handleLogout,

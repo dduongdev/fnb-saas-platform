@@ -1,8 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield } from 'lucide-react';
-import { getMyTenants } from '../../api/tenant';
-import { useToast } from '../../context/ToastContext';
+import { getMyTenants } from '../../api/tenant';import { getAccessKeyInfo } from '../../api/auth';import { useToast } from '../../context/ToastContext';
 
 import '../auth/LoginPage.css';
 
@@ -23,18 +22,27 @@ export const AccessKeyLoginPage = () => {
         setLoading(true);
         try {
             localStorage.setItem('pos_access_key', accessKey.trim());
+            const info = await getAccessKeyInfo();
+            localStorage.setItem('pos_access_key_role', info.role);
+
             const shops = await getMyTenants();
-            
             if (shops && shops.length > 0) {
+                localStorage.setItem('tenant_id', shops[0].id);
                 toast.success('Đăng nhập thành công!');
-                // The page will reload so AuthContext picks up the new key and sets user
-                window.location.href = '/dashboard'; 
+
+                if (info.role === 'KITCHEN') {
+                    window.location.href = '/kds';
+                } else {
+                    window.location.href = '/dashboard';
+                }
             } else {
                 localStorage.removeItem('pos_access_key');
+                localStorage.removeItem('pos_access_key_role');
                 toast.error('Access Key không hợp lệ hoặc hết hạn.');
             }
         } catch (error) {
             localStorage.removeItem('pos_access_key');
+            localStorage.removeItem('pos_access_key_role');
             toast.error('Lỗi đăng nhập: ' + error.message);
         } finally {
             setLoading(false);
