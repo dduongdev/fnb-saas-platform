@@ -29,13 +29,6 @@ spring:
         format_sql: true
         default_batch_fetch_size: 50
 
-  # 2. RabbitMQ
-  rabbitmq:
-    host: ${RABBITMQ_HOST}
-    port: ${RABBITMQ_PORT}
-    username: ${RABBITMQ_USER}
-    password: ${RABBITMQ_PASS}
-
 app:
   jwt:
     secret: ${APP_JWT_SECRET:ZmFrZV9zZWNyZXRfZm9yX2RldmVsb3BtZW50X2VuY29kaW5nMTIzNA==}
