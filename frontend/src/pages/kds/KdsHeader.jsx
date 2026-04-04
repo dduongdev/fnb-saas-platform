@@ -17,6 +17,8 @@ export default function KdsHeader({
   connected = false,
   error = null,
   sessions = [],
+  showLogout = false,
+  onLogout = () => {},
 }) {
   // Calculate comprehensive stats
   const stats = useMemo(() => {
@@ -65,9 +67,16 @@ export default function KdsHeader({
           <h1>🍳 Kitchen Display System</h1>
           <span className="kds-header-time">{currentTime}</span>
         </div>
-        <div className={`kds-connection-status ${connected ? 'connected' : 'disconnected'}`}>
-          <span className="kds-status-dot"></span>
-          {connected ? 'Kết nối' : 'Mất kết nối'}
+        <div className="kds-header-actions">
+          {showLogout && (
+            <button className="kds-logout-button" type="button" onClick={onLogout}>
+              Đăng xuất
+            </button>
+          )}
+          <div className={`kds-connection-status ${connected ? 'connected' : 'disconnected'}`}>
+            <span className="kds-status-dot"></span>
+            {connected ? 'Kết nối' : 'Mất kết nối'}
+          </div>
         </div>
       </div>
 

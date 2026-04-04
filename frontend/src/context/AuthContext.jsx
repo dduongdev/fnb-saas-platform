@@ -153,6 +153,7 @@ export function AuthProvider({ children }) {
         initialized,
         isAuthenticated,
         isKitchen,
+        isWaitstaff,
         login,
         directLogin,
         logout: handleLogout,
