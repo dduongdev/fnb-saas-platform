@@ -82,7 +82,11 @@ public class KdsRestController {
      * @return ApiResponse chứa List<KdsSessionDto> (active sessions)
      */
     @GetMapping("/sessions")
-    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
+    @com.project.fnb.aspect.RequirePermission({
+            com.project.fnb.aspect.OwnerPermissionValidator.class,
+            com.project.fnb.aspect.WaiterPermissionValidator.class,
+            com.project.fnb.aspect.KitchenPermissionValidator.class
+    })
     public ApiResponse<List<KdsSessionDto>> getSessions() {
         try {
             log.debug("Fetching KDS sessions via REST API");

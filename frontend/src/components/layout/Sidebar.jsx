@@ -59,6 +59,7 @@ export function Sidebar() {
     const { tenant, isOwner, clearTenant } = useTenant();
 
     const isWaitstaff = user?.isWaitstaff;
+    const isKitchen = user?.accessKeyRole === 'KITCHEN';
 
     const handleSwitchTenant = () => {
         clearTenant();
@@ -73,8 +74,12 @@ export function Sidebar() {
             </div>
 
             <nav className="sidebar-nav">
-                {menuItems.map((section) => {
-                    // Skip owner-only sections for non-owners
+                {(isKitchen ? [{
+                    section: 'Bếp',
+                    items: [
+                        { path: '/kds', icon: AppWindow, label: 'Màn hình bếp (KDS)' }
+                    ]
+                }] : menuItems).map((section) => {
                     if (section.ownerOnly && !isOwner) return null;
 
                     return (
@@ -114,6 +119,9 @@ export function Sidebar() {
                         <Store size={18} />
                         <span>Đổi quán</span>
                     </button>
+                )}
+                {isKitchen && (
+                    <div className="sidebar-footer-note">Chỉ truy cập KDS</div>
                 )}
                 <button className="sidebar-footer-btn sidebar-footer-btn-danger" onClick={logout}>
                     <LogOut size={18} />

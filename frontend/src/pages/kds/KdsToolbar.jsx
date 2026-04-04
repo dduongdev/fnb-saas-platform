@@ -16,6 +16,8 @@ export default function KdsToolbar({
   sessions = [],
   onFilterChange = () => {},
   onSearchChange = () => {},
+  showLogout = false,
+  onLogout = () => {},
 }) {
   // ...existing code...
   const [searchTerm, setSearchTerm] = useState('');
@@ -55,6 +57,14 @@ export default function KdsToolbar({
           </span>
         </div>
       </div>
+
+      {showLogout && (
+        <div className="kds-toolbar-section kds-toolbar-logout">
+          <button className="kds-logout-button" type="button" onClick={onLogout}>
+            Đăng xuất
+          </button>
+        </div>
+      )}
     </div>
   );
 }

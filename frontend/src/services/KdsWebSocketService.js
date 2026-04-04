@@ -72,6 +72,7 @@ class KdsWebSocketService {
           // STOMP over SockJS (backend endpoint expects /ws/kds via SockJS)
           connectHeaders: {
             'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+            'X-Access-Key': localStorage.getItem('pos_access_key') || '',
           },
           onConnect: () => {
             console.log('WebSocket connected');

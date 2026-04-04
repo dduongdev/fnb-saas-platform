@@ -14,10 +14,10 @@ export async function apiRequest(endpoint, options = {}) {
     ...options.headers,
   };
 
-  if (accessKey) {
-    headers['X-Access-Key'] = accessKey;
-  } else if (token) {
+  if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  } else if (accessKey) {
+    headers['X-Access-Key'] = accessKey;
   }
 
   if (tenantId && !options.skipTenant) {
@@ -49,10 +49,10 @@ export async function uploadFile(endpoint, formData, options = {}) {
 
   const headers = {};
 
-  if (accessKey) {
-    headers['X-Access-Key'] = accessKey;
-  } else if (token) {
+  if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  } else if (accessKey) {
+    headers['X-Access-Key'] = accessKey;
   }
 
   if (tenantId && !options.skipTenant) {

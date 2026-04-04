@@ -15,6 +15,7 @@
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { useKds } from '../../context/KdsContext';
 import KdsHeader from './KdsHeader';
 import KdsToolbar from './KdsToolbar';
@@ -23,6 +24,7 @@ import './KdsPage.css';
 
 export default function KdsPage() {
   const { sessions, error, loading, connected } = useKds();
+  const { logout, isWaitstaff } = useAuth();
   const [filteredSessions, setFilteredSessions] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -81,12 +83,16 @@ export default function KdsPage() {
         connected={connected}
         error={error}
         sessions={sessions}
+        showLogout={isWaitstaff}
+        onLogout={logout}
       />
 
       {/* Toolbar */}
       <KdsToolbar
         sessions={sessions}
         onSearchChange={handleSearchChange}
+        showLogout={isWaitstaff}
+        onLogout={logout}
       />
 
       {/* Main Content */}

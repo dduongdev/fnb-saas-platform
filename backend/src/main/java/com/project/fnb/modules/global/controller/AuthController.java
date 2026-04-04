@@ -2,6 +2,8 @@ package com.project.fnb.modules.global.controller;
 
 import com.project.fnb.common.dto.ApiResponse;
 import com.project.fnb.common.exception.AppException;
+import com.project.fnb.infrastructure.security.AccessKeyUserDetails;
+import com.project.fnb.modules.global.dto.AccessKeyInfoDto;
 import com.project.fnb.modules.global.dto.LoginRequest;
 import com.project.fnb.modules.global.dto.LoginResponse;
 import com.project.fnb.modules.global.dto.RegisterUserRequest;
@@ -10,6 +12,8 @@ import com.project.fnb.modules.global.service.AuthService;
 import com.project.fnb.modules.global.service.UserService;
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -32,5 +36,20 @@ public class AuthController {
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@RequestBody LoginRequest request) {
         return ApiResponse.success(authService.login(request));
+    }
+
+    @GetMapping("/access-key-info")
+    public ApiResponse<AccessKeyInfoDto> getAccessKeyInfo(
+            @AuthenticationPrincipal Object principal
+    ) {
+        if (principal instanceof AccessKeyUserDetails accessKey) {
+            String role = accessKey.getRole().replace("ROLE_", "");
+            return ApiResponse.success(AccessKeyInfoDto.builder()
+                    .accessKeyId(accessKey.getAccessKeyId())
+                    .tenantId(accessKey.getTenantId())
+                    .role(role)
+                    .build());
+        }
+        throw new AppException(401, "Chỉ hỗ trợ Access Key");
     }
 }

@@ -67,6 +67,29 @@
   font-family: 'Courier New', monospace;
 }
 
+.kds-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.kds-logout-button {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.kds-logout-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
 .kds-connection-status {
   display: flex;
   align-items: center;
@@ -203,6 +226,28 @@
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.kds-toolbar-logout {
+  margin-left: auto;
+}
+
+.kds-logout-button {
+  background: #ff5c00;
+  color: white;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(255, 92, 0, 0.2);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.kds-logout-button:hover {
+  background: #ff7a2c;
+  transform: translateY(-1px);
 }
 
 .kds-toolbar-label {
