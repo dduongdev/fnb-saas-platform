@@ -1,5 +1,6 @@
 package com.project.fnb.modules.pos.dto;
 
+import com.project.fnb.modules.menu.entity.ProductImage;
 import com.project.fnb.modules.pos.entity.DiningTable;
 import com.project.fnb.modules.pos.entity.Order;
 import com.project.fnb.modules.pos.entity.ServingSession;
@@ -137,6 +138,9 @@ public class SessionResponse {
                 .filter(img -> img.getIsPrimary())
                 .findFirst()
                 .map(img -> img.getImageUrl())
-                .orElse(item.getProduct().getImages().get(0).getImageUrl());
+                .orElseGet(() -> item.getProduct().getImages().stream()
+                        .findFirst()
+                        .map(ProductImage::getImageUrl)
+                        .orElse(null));
     }
 }

@@ -73,7 +73,7 @@ class ProductServiceTest {
         testProduct.setPrice(new BigDecimal("100.00"));
         testProduct.setCategory(testCategory);
         testProduct.setStatus(Product.ProductStatus.AVAILABLE);
-        testProduct.setImages(new ArrayList<>());
+        testProduct.setImages(new java.util.HashSet<>());
     }
 
     @AfterEach

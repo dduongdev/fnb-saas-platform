@@ -18,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -143,7 +144,7 @@ public class ProductService {
         // Upload ảnh
         if (files != null && !files.isEmpty()) {
             List<ProductImage> images = uploadImages(product, files);
-            product.setImages(images);
+            product.setImages(new HashSet<>(images));  // Convert List to Set
         }
 
         return mapToResponse(product);

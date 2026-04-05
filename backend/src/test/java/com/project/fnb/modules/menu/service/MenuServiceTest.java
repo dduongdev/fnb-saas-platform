@@ -46,7 +46,7 @@ class MenuServiceTest {
         ProductImage image1 = new ProductImage();
         image1.setIsPrimary(true);
         image1.setImageUrl("http://image1.com");
-        activeProduct.setImages(Collections.singletonList(image1));
+        activeProduct.setImages(new java.util.HashSet<>(java.util.Collections.singletonList(image1)));
 
         Product hiddenProduct = new Product();
         hiddenProduct.setId(2L);
@@ -60,12 +60,12 @@ class MenuServiceTest {
         deletedProduct.setStatus(Product.ProductStatus.AVAILABLE);
         deletedProduct.setIsDeleted(true);
 
-        category.setProducts(Arrays.asList(activeProduct, hiddenProduct, deletedProduct));
+        category.setProducts(new java.util.HashSet<>(Arrays.asList(activeProduct, hiddenProduct, deletedProduct)));
 
         Category emptyCategory = new Category();
         emptyCategory.setId(2);
         emptyCategory.setName("Empty Category");
-        emptyCategory.setProducts(new ArrayList<>());
+        emptyCategory.setProducts(new java.util.HashSet<>());
 
         // Mock the new method that includes product images (N+1 fix)
         when(categoryRepository.findAllWithProductsAndImages()).thenReturn(Arrays.asList(category, emptyCategory));

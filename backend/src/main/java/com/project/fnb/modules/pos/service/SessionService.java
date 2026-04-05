@@ -4,6 +4,7 @@ import com.project.fnb.common.exception.AppException;
 import com.project.fnb.infrastructure.security.TenantContext;
 import com.project.fnb.modules.global.repository.TenantRepository;
 import com.project.fnb.modules.menu.entity.Product;
+import com.project.fnb.modules.menu.entity.ProductImage;
 import com.project.fnb.modules.menu.repository.ProductRepository;
 import com.project.fnb.modules.pos.dto.*;
 import com.project.fnb.modules.pos.entity.*;
@@ -1056,7 +1057,10 @@ public class SessionService {
         if (product.getImages() == null || product.getImages().isEmpty()) {
             return null;
         }
-        return product.getImages().get(0).getImageUrl();
+        return product.getImages().stream()
+                .findFirst()
+                .map(ProductImage::getImageUrl)
+                .orElse(null);
     }
 
     /**

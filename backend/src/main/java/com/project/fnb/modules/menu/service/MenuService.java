@@ -37,7 +37,10 @@ public class MenuService {
                                 thumb = p.getImages().stream()
                                         .filter(ProductImage::getIsPrimary).findFirst()
                                         .map(ProductImage::getImageUrl)
-                                        .orElse(p.getImages().get(0).getImageUrl());
+                                        .orElseGet(() -> p.getImages().stream()
+                                                .findFirst()
+                                                .map(ProductImage::getImageUrl)
+                                                .orElse(null));
                             }
 
                             return PublicMenuDto.ProductItem.builder()

@@ -4,7 +4,8 @@ import com.project.fnb.common.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
@@ -44,5 +45,5 @@ public class Category extends BaseEntity {
     private Boolean isDefault = false;
 
     @OneToMany(mappedBy = "category", fetch = FetchType.LAZY)
-    private List<Product> products;
+    private Set<Product> products = new HashSet<>();
 }

@@ -89,7 +89,10 @@ public class OrderResponse {
                                 .findFirst()
                                 .map(ProductImage::getImageUrl)
                                 // Nếu không có ảnh chính, lấy ảnh đầu tiên
-                                .orElse(i.getProduct().getImages().get(0).getImageUrl());
+                                .orElseGet(() -> i.getProduct().getImages().stream()
+                                        .findFirst()
+                                        .map(ProductImage::getImageUrl)
+                                        .orElse(null));
                     }
 
                     return ItemDto.builder()
