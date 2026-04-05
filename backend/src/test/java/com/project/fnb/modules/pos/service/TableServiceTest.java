@@ -53,7 +53,7 @@ class TableServiceTest {
         table.setName("Table 1");
         table.setStatus(DiningTable.Status.AVAILABLE);
 
-        when(tableRepository.findAll(any(org.springframework.data.domain.Sort.class))).thenReturn(List.of(table));
+        when(tableRepository.findAllWithSession()).thenReturn(List.of(table));
 
         List<TableDto> result = tableService.getTables();
 

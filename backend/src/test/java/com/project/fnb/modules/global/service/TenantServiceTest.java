@@ -198,10 +198,9 @@ class TenantServiceTest {
     void getMyTenants_ShouldReturnTenantListForOwner() {
         // Arrange
         Tenant t1 = Tenant.builder().id("1").ownerId(OWNER_ID).build();
-        Tenant t2 = Tenant.builder().id("2").ownerId("other-user").build();
         Tenant t3 = Tenant.builder().id("3").ownerId(OWNER_ID).build();
         
-        when(tenantRepository.findAll()).thenReturn(Arrays.asList(t1, t2, t3));
+        when(tenantRepository.findByOwnerId(OWNER_ID)).thenReturn(Arrays.asList(t1, t3));
 
         // Act
         List<Tenant> result = tenantService.getMyTenants(OWNER_ID);

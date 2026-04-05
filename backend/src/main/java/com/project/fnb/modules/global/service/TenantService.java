@@ -267,20 +267,18 @@ public class TenantService {
      * 
      * <p><b>Performance Note:</b></p>
      * <ul>
-     *   <li>Hiện tại sử dụng findAll() rồi filter in-memory (không hiệu quả)</li>
-     *   <li>Trong tương lai nên dùng custom query: findByOwnerId(ownerId) cho better performance</li>
+     *   <li>Sử dụng custom query findByOwnerId(ownerId) với SQL WHERE clause thay vì findAll() + in-memory filter</li>
+     *   <li>Giải quyết N+1 query issue #7 - chỉ tải dữ liệu cần thiết từ database</li>
      * </ul>
      * 
      * @param ownerId User ID của owner (lấy từ JWT token)
      * 
      * @return List<Tenant> danh sách tenant sở hữu bởi owner này (có thể rỗng)
      * 
-     * @see TenantRepository
+     * @see TenantRepository#findByOwnerId(String)
      */
     public List<Tenant> getMyTenants(String ownerId) {
-        return tenantRepository.findAll().stream()
-                .filter(t -> t.getOwnerId().equals(ownerId))
-                .toList();
+        return tenantRepository.findByOwnerId(ownerId);
     }
     
     /**

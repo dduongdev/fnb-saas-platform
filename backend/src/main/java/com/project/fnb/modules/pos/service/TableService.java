@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
+import java.util.Comparator;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -101,10 +102,14 @@ public class TableService {
      *   <li>Hiển thị dropdown chọn bàn khi mở session mới</li>
      * </ul>
      * 
+     * <p><b>Performance:</b> Sử dụng findAllWithSession() để eager load currentSession,
+     * tránh N+1 query khi mapToDto() access t.getCurrentSession(). Giải quyết N+1 query issue #9.</p>
+     * 
      * @return Danh sách TableDto chứa id, name, status, sessionId, qrCodeUrl
      */
     public List<TableDto> getTables() {
-        return tableRepository.findAll(Sort.by("name")).stream()
+        return tableRepository.findAllWithSession().stream()
+                .sorted(Comparator.comparing(DiningTable::getName))
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
     }
