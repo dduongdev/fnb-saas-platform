@@ -41,4 +41,17 @@ public interface TableRepository extends JpaRepository<DiningTable, String> {
     @NonNull
     @Query("SELECT t FROM DiningTable t WHERE t.id = :id")
     Optional<DiningTable> findById(@NonNull @Param("id") String id);
+
+    /**
+     * Lấy tất cả bàn với current sessions (eager load).
+     * 
+     * <p><b>Purpose:</b> Fix N+1 query issue trong SessionService.notifyTableUpdate().
+     * Eager load currentSession để tránh N queries khi access t.getCurrentSession().</p>
+     * 
+     * @return List&lt;DiningTable&gt; với tất cả currentSession đã load
+     */
+    @Query("SELECT t FROM DiningTable t " +
+           "LEFT JOIN FETCH t.currentSession " +
+           "WHERE t.isDeleted = false")
+    List<DiningTable> findAllWithSession();
 }

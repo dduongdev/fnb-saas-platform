@@ -86,7 +86,10 @@ public class ProductService {
         } else if (status != null) {
             products = productRepository.findByStatus(status, pageable);
         } else {
-            products = productRepository.findAll(pageable);
+            // Fix N+1 query: Use findAllWithImages() to eager load all images
+            // Before: 1 query + N queries (for each product's images)
+            // After: 1 query with JOIN FETCH
+            products = productRepository.findAllWithImages(pageable);
         }
         
         return products.map(this::mapToResponse);

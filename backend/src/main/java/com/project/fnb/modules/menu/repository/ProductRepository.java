@@ -30,4 +30,18 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     
     // Find by category and status
     Page<Product> findByCategoryIdAndStatus(Integer categoryId, Product.ProductStatus status, Pageable pageable);
+
+    /**
+     * Lấy tất cả products với images (eager load) - có pagination.
+     * 
+     * <p><b>Purpose:</b> Fix N+1 query issue trong ProductService.getAllProducts().
+     * Eager load tất cả images trong 1 query thay vì N queries.</p>
+     * 
+     * @param pageable Pagination
+     * @return Page&lt;Product&gt; với tất cả images đã load
+     */
+    @Query("SELECT p FROM Product p " +
+           "LEFT JOIN FETCH p.images " +
+           "WHERE p.isDeleted = false")
+    Page<Product> findAllWithImages(Pageable pageable);
 }

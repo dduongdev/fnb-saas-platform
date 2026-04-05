@@ -1096,7 +1096,12 @@ public class SessionService {
         String tenantId = TenantContext.getTenantId();
         var tenant = tenantRepository.findById(tenantId).orElseThrow();
 
-        Order order = session.getPrimaryOrder();
+        // Fix N+1 query: Reload session with orders and items + products eager loaded
+        // This ensures when we access order.getItems().getProduct().getName(), no additional queries
+        ServingSession reloadedSession = sessionRepository.findByIdWithDetails(session.getId())
+                .orElse(session);
+
+        Order order = reloadedSession.getPrimaryOrder();
         List<InvoiceDto.InvoiceItemDto> items = order.getItems().stream()
                 .map(i -> InvoiceDto.InvoiceItemDto.builder()
                         .productName(i.getProduct().getName())
@@ -1106,7 +1111,7 @@ public class SessionService {
                         .build())
                 .toList();
 
-        BigDecimal total = session.getOrders().stream()
+        BigDecimal total = reloadedSession.getOrders().stream()
                 .map(Order::getTotalAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -1115,9 +1120,9 @@ public class SessionService {
                 .tenantAddress(tenant.getAddress())
                 .tenantLogo(tenant.getLogoUrl())
                 .orderId(order.getId())
-                .tableName(session.getTableNames())
-                .checkInTime(session.getStartedAt())
-                .checkOutTime(session.getEndedAt())
+                .tableName(reloadedSession.getTableNames())
+                .checkInTime(reloadedSession.getStartedAt())
+                .checkOutTime(reloadedSession.getEndedAt())
                 .items(items)
                 .totalAmount(total)
                 .paymentMethod(order.getPaymentMethod())
@@ -1254,7 +1259,10 @@ public class SessionService {
         String tenantId = TenantContext.getTenantId();
         try {
             String topic = "/topic/tenant/" + tenantId + "/tables";
-            List<TableDto> tables = tableRepository.findAll().stream()
+            // Fix N+1 query: Use findAllWithSession() to eager load currentSession
+            // Before: 1 query + N queries (for each table's currentSession)
+            // After: 1 query with JOIN FETCH
+            List<TableDto> tables = tableRepository.findAllWithSession().stream()
                     .map(t -> TableDto.builder()
                             .id(t.getId())
                             .name(t.getName())

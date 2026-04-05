@@ -86,7 +86,8 @@ class ProductServiceTest {
         Pageable pageable = PageRequest.of(0, 10);
         Page<Product> page = new PageImpl<>(Collections.singletonList(testProduct));
         
-        when(productRepository.findAll(pageable))
+        // Mock the new method that includes images (N+1 fix)
+        when(productRepository.findAllWithImages(pageable))
                 .thenReturn(page);
 
         Page<ProductResponse> result = productService.getProducts(null, null, pageable);

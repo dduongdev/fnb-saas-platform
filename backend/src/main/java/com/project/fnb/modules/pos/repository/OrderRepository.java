@@ -81,4 +81,19 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
            "LEFT JOIN FETCH oi.product " +
            "WHERE o.id = :id")
     Optional<Order> findByIdWithItemsAndProducts(@Param("id") Long id);
+
+    /**
+     * Tìm tất cả orders của session với items và products (eager load).
+     * 
+     * <p><b>Purpose:</b> Fix N+1 query issue trong SessionService.createInvoice().
+     * Eager load tất cả items + products trong 1 query.</p>
+     * 
+     * @param sessionId Session ID
+     * @return List&lt;Order&gt; với tất cả items + products
+     */
+    @Query("SELECT o FROM Order o " +
+           "LEFT JOIN FETCH o.items oi " +
+           "LEFT JOIN FETCH oi.product " +
+           "WHERE o.session.id = :sessionId")
+    List<Order> findBySessionIdWithItemsAndProducts(@Param("sessionId") Long sessionId);
 }
