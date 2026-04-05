@@ -746,7 +746,11 @@ public class SessionService {
                 "🔔 Bàn " + table.getName() + " có order mới từ khách!");
         notifyPendingSessionUpdate();
 
-        return buildCustomerOrderResponse(session);
+        // Fix N+1 query: Reload từ DB với complete JOIN FETCH (items + products)
+        // trước khi gọi buildCustomerOrderResponse()
+        ServingSession reloadedSession = sessionRepository.findByIdWithDetails(session.getId())
+                .orElse(session);
+        return buildCustomerOrderResponse(reloadedSession);
     }
 
     /**

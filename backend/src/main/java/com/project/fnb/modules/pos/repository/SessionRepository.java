@@ -134,4 +134,25 @@ public interface SessionRepository extends JpaRepository<ServingSession, Long> {
            "LEFT JOIN FETCH i.product " +
            "ORDER BY s.startedAt DESC")
     Page<ServingSession> findSessionHistory(Pageable pageable);
+
+    /**
+     * Lấy tất cả session ACTIVE với orders, items, và products (eager load hoàn chỉnh).
+     * 
+     * <p><b>Purpose:</b> Fix N+1 query issue trong KdsService.getAllActiveSessions().
+     * Đầy đủ JOIN FETCH chain: sessions → tables, orders → items → products.</p>
+     * 
+     * <p><b>Performance:</b> 1 query thay vì 1 + N + M + K queries.</p>
+     * 
+     * <p><b>Use Case:</b> Hiển thị KDS (Kitchen Display System) với tất cả pending items.</p>
+     * 
+     * @return Danh sách ServingSession ACTIVE với tất cả relations, sắp xếp mới nhất trước
+     */
+    @Query("SELECT DISTINCT s FROM ServingSession s " +
+           "LEFT JOIN FETCH s.tables " +
+           "LEFT JOIN FETCH s.orders o " +
+           "LEFT JOIN FETCH o.items oi " +
+           "LEFT JOIN FETCH oi.product " +
+           "WHERE s.status = 'ACTIVE' " +
+           "ORDER BY s.createdAt DESC")
+    List<ServingSession> findAllActiveWithOrdersAndItemsAndProducts();
 }

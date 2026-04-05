@@ -71,7 +71,8 @@ class KdsServiceTest {
         sessionOld.getTables().add(table);
         sessionOld.getOrders().add(order);
 
-        when(sessionRepository.findAllActive()).thenReturn(List.of(sessionNew, sessionOld));
+        // Mock the new method that includes orders, items, and products (N+1 fix)
+        when(sessionRepository.findAllActiveWithOrdersAndItemsAndProducts()).thenReturn(List.of(sessionNew, sessionOld));
 
         List<KdsSessionDto> result = kdsService.getAllActiveSessions();
 

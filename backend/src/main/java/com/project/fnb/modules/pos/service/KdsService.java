@@ -57,7 +57,10 @@ public class KdsService {
      */
     @Transactional(readOnly = true)
     public List<KdsSessionDto> getAllActiveSessions() {
-        List<ServingSession> sessions = sessionRepository.findAllActive();
+        // Fix N+1 query: Use findAllActiveWithOrdersAndItemsAndProducts() with complete JOIN FETCH
+        // Before: 1 query (tables only) + N queries (orders) + M queries (items) + K queries (products)
+        // After: 1 query with JOIN FETCH chain: orders → items → products = 1 query
+        List<ServingSession> sessions = sessionRepository.findAllActiveWithOrdersAndItemsAndProducts();
         
         return sessions.stream()
                 .map(this::transformToKdsSessionDto)

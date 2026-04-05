@@ -64,4 +64,21 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      */
     @Query(value = "SELECT * FROM orders WHERE id = :id", nativeQuery = true)
     Optional<Order> findByIdGlobal(@Param("id") Long id);
+
+    /**
+     * Tìm order theo ID với items và products (eager load).
+     * 
+     * <p><b>Purpose:</b> Fix N+1 query issue trong SessionService.buildCustomerOrderResponse().
+     * Đầy đủ JOIN FETCH chain: order → items → product.</p>
+     * 
+     * <p><b>Performance:</b> 1 query thay vì 1 + N queries (N = số items trong order).</p>
+     * 
+     * @param id Order ID
+     * @return Optional&lt;Order&gt; với tất cả items + products
+     */
+    @Query("SELECT o FROM Order o " +
+           "LEFT JOIN FETCH o.items oi " +
+           "LEFT JOIN FETCH oi.product " +
+           "WHERE o.id = :id")
+    Optional<Order> findByIdWithItemsAndProducts(@Param("id") Long id);
 }

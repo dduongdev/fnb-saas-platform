@@ -24,4 +24,21 @@ public interface CategoryRepository extends JpaRepository<Category, Integer> {
            "WHERE c.isActive = true " +
            "ORDER BY c.displayOrder ASC")
     List<Category> findAllWithProducts();
+
+    /**
+     * Lấy tất cả categories với products và images (eager load).
+     * 
+     * <p><b>Purpose:</b> Fix N+1 query issue trong MenuService.getPublicMenu().
+     * Đầy đủ JOIN FETCH chain: categories → products → images.</p>
+     * 
+     * <p><b>Performance:</b> 1 query thay vì 1 + N + M queries.</p>
+     * 
+     * @return Danh sách Category với tất cả products + images
+     */
+    @Query("SELECT DISTINCT c FROM Category c " +
+           "LEFT JOIN FETCH c.products p " +
+           "LEFT JOIN FETCH p.images " +
+           "WHERE c.isActive = true " +
+           "ORDER BY c.displayOrder ASC")
+    List<Category> findAllWithProductsAndImages();
 }

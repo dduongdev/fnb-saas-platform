@@ -67,7 +67,8 @@ class MenuServiceTest {
         emptyCategory.setName("Empty Category");
         emptyCategory.setProducts(new ArrayList<>());
 
-        when(categoryRepository.findAllWithProducts()).thenReturn(Arrays.asList(category, emptyCategory));
+        // Mock the new method that includes product images (N+1 fix)
+        when(categoryRepository.findAllWithProductsAndImages()).thenReturn(Arrays.asList(category, emptyCategory));
 
         // Act
         List<PublicMenuDto> result = menuService.getPublicMenu();

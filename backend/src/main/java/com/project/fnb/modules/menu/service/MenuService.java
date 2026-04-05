@@ -21,7 +21,10 @@ public class MenuService {
 
     @Transactional(readOnly = true)
     public List<PublicMenuDto> getPublicMenu() {
-        List<Category> categories = categoryRepository.findAllWithProducts();
+        // Fix N+1 query: Use findAllWithProductsAndImages() with complete JOIN FETCH
+        // Before: 1 query + N queries (products) + M queries (images) = 1 + N + M
+        // After: 1 query with JOIN FETCH product.images = 1 query
+        List<Category> categories = categoryRepository.findAllWithProductsAndImages();
 
         return categories.stream().map(cat -> PublicMenuDto.builder()
                 .categoryId(cat.getId())
