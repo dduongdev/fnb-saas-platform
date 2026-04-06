@@ -148,7 +148,10 @@ function request(method, path, body, headers, parseBody) {
   }
 
   const ok = res.status >= 200 && res.status < 300 && (!parsed || parsed.code === 200);
-  businessErrorRate.add(!ok, { path, method });
+  const metricPath = path
+    .replace(/[0-9a-fA-F]{8}-[0-9a-fA-F-]{27,36}/g, ':id')
+    .replace(/\/\d+/g, '/:id');
+  businessErrorRate.add(!ok, { path: metricPath, method });
 
   if (!ok && IS_SMOKE) {
     console.log(`[SMOKE-ERROR] ${method} ${path} status=${res.status} message=${parsed ? parsed.message : 'N/A'}`);
@@ -183,6 +186,19 @@ function authHeaders(ctx) {
 function jsonHeaders(ctx) {
   return {
     ...authHeaders(ctx),
+    'Content-Type': 'application/json',
+  };
+}
+
+function publicHeaders(ctx) {
+  return {
+    'X-Tenant-ID': ctx.tenantId,
+  };
+}
+
+function publicJsonHeaders(ctx) {
+  return {
+    ...publicHeaders(ctx),
     'Content-Type': 'application/json',
   };
 }
@@ -335,6 +351,7 @@ export function setup() {
 export function sessionManagement(data) {
   const ctx = { token: data.token, tenantId: data.tenantId };
   const opsTableIds = Array.isArray(data.opsTableIds) && data.opsTableIds.length ? data.opsTableIds : data.tableIds;
+  const productId = Number(vuPick(data.productIds, 0));
 
   group('session open/close', function () {
     const tableId = pickAvailableTable(ctx, opsTableIds) || vuPick(opsTableIds, 0);
@@ -351,6 +368,16 @@ export function sessionManagement(data) {
 
     sessionOpenCount.add(1);
     const sessionId = openRes.data.sessionId;
+
+    const addRes = request(
+      'POST',
+      `/api/pos/sessions/${sessionId}/items`,
+      JSON.stringify({ items: [{ productId, quantity: 1 }] }),
+      jsonHeaders(ctx),
+      true
+    );
+    assertStep(addRes, 'session add item success', `POST /api/pos/sessions/${sessionId}/items`);
+    if (!addRes.ok) return;
 
     const payRes = request(
       'POST',
@@ -370,23 +397,54 @@ export function orderProcessing(data) {
   const opsTableIds = Array.isArray(data.opsTableIds) && data.opsTableIds.length ? data.opsTableIds : data.tableIds;
 
   group('order processing', function () {
-    const tableId = vuPick(qrTableIds, 1);
+    const tableId = pickAvailableTable(ctx, qrTableIds) || vuPick(qrTableIds, 1);
     const p1 = Number(vuPick(data.productIds, 2));
     const p2 = Number(vuPick(data.productIds, 3));
 
-    // Public customer side flow: create + status check only.
+    // Public customer side flow: create, check status, request payment, and close.
     const customer = request(
       'POST',
       '/api/pos/public/sessions',
       JSON.stringify({ tableId, items: [{ productId: p1, quantity: 1 }], customerNote: 'k6 customer order' }),
-      { 'Content-Type': 'application/json' },
+      publicJsonHeaders(ctx),
       true
     );
     assertStep(customer, 'customer order success', 'POST /api/pos/public/sessions');
 
     if (customer.ok && customer.data && customer.data.sessionId) {
-      const customerStatus = request('GET', `/api/pos/public/sessions/${customer.data.sessionId}`, null, null, true);
+      const confirmed = request(
+        'POST',
+        `/api/pos/sessions/${customer.data.sessionId}/confirm`,
+        null,
+        authHeaders(ctx),
+        true
+      );
+      assertStep(confirmed, 'customer confirm session success', `POST /api/pos/sessions/${customer.data.sessionId}/confirm`);
+
+      const customerStatus = request('GET', `/api/pos/public/sessions/${customer.data.sessionId}`, null, publicHeaders(ctx), true);
       assertStep(customerStatus, 'customer status success', `GET /api/pos/public/sessions/${customer.data.sessionId}`);
+
+      const customerRequestPayment = request(
+        'POST',
+        `/api/pos/public/sessions/${customer.data.sessionId}/request-payment`,
+        null,
+        publicHeaders(ctx),
+        true
+      );
+      assertStep(
+        customerRequestPayment,
+        'customer request payment success',
+        `POST /api/pos/public/sessions/${customer.data.sessionId}/request-payment`
+      );
+
+      const customerPay = request(
+        'POST',
+        `/api/pos/sessions/${customer.data.sessionId}/pay`,
+        JSON.stringify({ method: data.paymentMethod }),
+        jsonHeaders(ctx),
+        true
+      );
+      assertStep(customerPay, 'customer pay session success', `POST /api/pos/sessions/${customer.data.sessionId}/pay`);
     }
 
     // Staff internal flow: open session, add/update/delete items.
@@ -429,6 +487,15 @@ export function orderProcessing(data) {
 
     const del = request('DELETE', `/api/pos/sessions/${sessionId}/items/${itemId}`, null, authHeaders(ctx), true);
     assertStep(del, 'remove item success', `DELETE /api/pos/sessions/${sessionId}/items/${itemId}`);
+
+    const payStaff = request(
+      'POST',
+      `/api/pos/sessions/${sessionId}/pay`,
+      JSON.stringify({ method: data.paymentMethod }),
+      jsonHeaders(ctx),
+      true
+    );
+    assertStep(payStaff, 'staff pay session success', `POST /api/pos/sessions/${sessionId}/pay`);
   });
 }
 
@@ -438,7 +505,7 @@ export function menuAndProduct(data) {
   group('menu and product search', function () {
     const term = vuPick(SEARCH_TERMS, 1);
 
-    const m = request('GET', `/api/pos/public/menu?tenantId=${encodeURIComponent(data.tenantId)}`, null, null, true);
+    const m = request('GET', `/api/pos/public/menu?tenantId=${encodeURIComponent(data.tenantId)}`, null, publicHeaders(ctx), true);
     assertStep(m, 'public menu success', 'GET /api/pos/public/menu');
 
     const c = request('GET', '/api/categories', null, authHeaders(ctx), true);
@@ -479,7 +546,7 @@ export function transactionFlow(data) {
     assertStep(add, 'transaction add item success', `POST /api/pos/sessions/${sessionId}/items`);
     if (!add.ok) return;
 
-    const requestBill = request('POST', `/api/pos/public/sessions/${sessionId}/request-payment`, null, null, true);
+    const requestBill = request('POST', `/api/pos/public/sessions/${sessionId}/request-payment`, null, publicHeaders(ctx), true);
     assertStep(requestBill, 'request payment success', `POST /api/pos/public/sessions/${sessionId}/request-payment`);
 
     const pay = request(
