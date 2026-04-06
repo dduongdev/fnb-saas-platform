@@ -204,21 +204,6 @@ function vuPick(list, offset) {
   return list[(exec.vu.idInTest + exec.scenario.iterationInTest + (offset || 0)) % list.length];
 }
 
-function listTables(ctx) {
-  return request('GET', '/api/pos/tables', null, authHeaders(ctx), true);
-}
-
-function pickAvailableTable(ctx) {
-  const tablesRes = listTables(ctx);
-  if (!tablesRes.ok || !Array.isArray(tablesRes.data)) return null;
-
-  const candidates = tablesRes.data.filter(function (t) {
-    return String(t.status || '').toUpperCase() === 'AVAILABLE' && (t.sessionId === null || t.sessionId === undefined);
-  });
-  if (!candidates.length) return null;
-  return String(randomFrom(candidates).id);
-}
-
 function getSessionDetail(ctx, sessionId) {
   return request('GET', `/api/pos/sessions/${sessionId}`, null, authHeaders(ctx), true);
 }
@@ -321,7 +306,7 @@ export function sessionManagement(data) {
   const ctx = { token: data.token, tenantId: data.tenantId };
 
   group('session open/close', function () {
-    const tableId = pickAvailableTable(ctx) || vuPick(data.tableIds, 0);
+    const tableId = vuPick(data.tableIds, 0);
 
     const openRes = request(
       'POST',
@@ -352,7 +337,7 @@ export function orderProcessing(data) {
   const ctx = { token: data.token, tenantId: data.tenantId };
 
   group('order processing', function () {
-    const tableId = pickAvailableTable(ctx) || vuPick(data.tableIds, 1);
+    const tableId = vuPick(data.tableIds, 1);
     const p1 = Number(vuPick(data.productIds, 2));
     const p2 = Number(vuPick(data.productIds, 3));
 
@@ -372,7 +357,7 @@ export function orderProcessing(data) {
     }
 
     // Staff internal flow: open session, add/update/delete items.
-    const staffTable = pickAvailableTable(ctx) || vuPick(data.tableIds, 2);
+    const staffTable = vuPick(data.tableIds, 2);
     const staffOpen = request(
       'POST',
       '/api/pos/sessions',
@@ -435,7 +420,7 @@ export function transactionFlow(data) {
   const ctx = { token: data.token, tenantId: data.tenantId };
 
   group('transaction flow', function () {
-    const tableId = pickAvailableTable(ctx) || vuPick(data.tableIds, 4);
+    const tableId = vuPick(data.tableIds, 4);
     const productId = Number(vuPick(data.productIds, 0));
 
     const opened = request(
