@@ -1,0 +1,13 @@
+{
+  "ownerPassword": "Password@123",
+  "paymentMethod": "CASH",
+  "searchTerms": ["pho", "com", "ga", "tra"],
+  "tableNames": ["K6-A1", "K6-A2", "K6-B1", "K6-B2", "K6-C1", "K6-C2"],
+  "products": [
+    { "name": "K6 Pho Bo", "price": 45000 },
+    { "name": "K6 Com Tam", "price": 39000 },
+    { "name": "K6 Tra Dao", "price": 29000 },
+    { "name": "K6 Bun Cha", "price": 42000 },
+    { "name": "K6 Cafe Sua", "price": 25000 }
+  ]
+}

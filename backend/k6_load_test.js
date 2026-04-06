@@ -1,687 +1,479 @@
 import http from 'k6/http';
-import { check, sleep } from 'k6';
-import { Counter } from 'k6/metrics';
+import { check, group, sleep, fail } from 'k6';
+import exec from 'k6/execution';
+import { SharedArray } from 'k6/data';
+import { Counter, Rate } from 'k6/metrics';
 
-const RAW_BASE_URL = (__ENV.BASE_URL || 'http://localhost:8081').replace(/\/$/, '');
-const API_BASE_URL = RAW_BASE_URL.endsWith('/api') ? RAW_BASE_URL : `${RAW_BASE_URL}/api`;
-const BASE_URL = API_BASE_URL;
-const PUBLIC_URL = `${API_BASE_URL}/public`;
-const CUSTOMERS_URL = `${API_BASE_URL}/pos/public`;
+const BASE_URL = (__ENV.BASE_URL || 'http://localhost:8081').replace(/\/$/, '');
+const DATA_FILE = __ENV.DATA_FILE || './k6_data.json';
+const PROFILE = (__ENV.TEST_PROFILE || 'stress').toLowerCase();
+const IS_SMOKE = PROFILE === 'smoke';
+const STRESS_SCALE = Math.max(0.05, Number(__ENV.STRESS_SCALE || '1'));
+const STRICT_MODE = (__ENV.STRICT_MODE || (IS_SMOKE ? 'true' : 'false')).toLowerCase() === 'true';
 
-let authToken = '';
-let tenantId = '';
-let userId = '';
-let productId = 0;
-let categoryId = 1;
-let sessionId = 0;
-let tableId = '';
-let accessKeyId = '';
-let customerSessionId = 0;
+const businessErrorRate = new Rate('business_error_rate');
+const sessionOpenCount = new Counter('session_open_count');
+const sessionCloseCount = new Counter('session_close_count');
 
-const errorCounter = new Counter('errors');
-const successCounter = new Counter('success');
+const seed = new SharedArray('k6-seed', function () {
+  const raw = open(DATA_FILE).replace(/^\uFEFF/, '');
+  return [JSON.parse(raw)];
+})[0];
+
+const SEARCH_TERMS = Array.isArray(seed.searchTerms) && seed.searchTerms.length
+  ? seed.searchTerms
+  : ['pho', 'com', 'ga'];
+
+const TABLE_NAMES = Array.isArray(seed.tableNames) && seed.tableNames.length
+  ? seed.tableNames
+  : ['K6-T1', 'K6-T2', 'K6-T3', 'K6-T4', 'K6-T5'];
+
+const PRODUCT_SEEDS = Array.isArray(seed.products) && seed.products.length
+  ? seed.products
+  : [
+      { name: 'K6 Pho Bo', price: 45000 },
+      { name: 'K6 Com Ga', price: 39000 },
+      { name: 'K6 Tra Dao', price: 29000 },
+    ];
+
+function scaleTarget(value) {
+  return Math.max(1, Math.floor(value * STRESS_SCALE));
+}
 
 export const options = {
-  stages: [
-    { duration: '1m', target: 200 },
-    { duration: '2m', target: 500 },
-    { duration: '2m', target: 1000 },
-    { duration: '2m', target: 500 },
-    { duration: '1m', target: 200 },
-    { duration: '30s', target: 0 },
-  ],
+  discardResponseBodies: true,
+  summaryTrendStats: ['avg', 'med', 'p(90)', 'p(95)', 'p(99)', 'max'],
   thresholds: {
-    http_req_duration: ['p(95)<1000', 'p(99)<2000'],
-    http_req_failed: ['rate<0.1'],
+    http_req_failed: ['rate<0.01'],
+    http_req_duration: ['p(95)<2000'],
+    business_error_rate: ['rate<0.01'],
   },
-};
-
-function generateUsername() {
-  return `user_${Math.random().toString(36).substring(7)}`;
-}
-
-function generatePassword() {
-  return `Pass@${Math.random().toString(36).substring(7)}123`;
-}
-
-function generateTenantName() {
-  const names = ['Restaurant', 'Cafe', 'Bistro', 'Diner', 'Grill'];
-  return names[Math.floor(Math.random() * names.length)] + `_${Math.random().toString(36).substring(7)}`;
-}
-
-function generateProductName() {
-  const products = ['Burger', 'Pizza', 'Salad', 'Coffee', 'Steak', 'Pasta', 'Noodles', 'Rice Bowl'];
-  return products[Math.floor(Math.random() * products.length)];
-}
-
-function checkResponse(res, name, expectedStatus = 200) {
-  let success = false;
-  
-  if (res.status === expectedStatus) {
-    success = true;
-    successCounter.add(1);
-  } else {
-    errorCounter.add(1);
-    console.log(`[ERROR-${name}] Expected ${expectedStatus} but got ${res.status}: ${res.body}`);
-  }
-  
-  check(res, {
-    [`${name} status ${expectedStatus}`]: (r) => r.status === expectedStatus,
-    [`${name} response time < 1000ms`]: (r) => r.timings.duration < 1000,
-  });
-  
-  return success;
-}
-
-function authFlow() {
-  console.log('[AUTH] Starting auth flow');
-  
-  if (authToken) {
-    return { token: authToken };
-  }
-  
-  const username = generateUsername();
-  const password = generatePassword();
-  
-  const registerRes = http.post(`${BASE_URL}/auth/register`, JSON.stringify({
-    username: username,
-    email: `${username}@test.com`,
-    password: password,
-    fullName: 'Test User',
-  }), {
-    headers: { 'Content-Type': 'application/json' },
-    timeout: '15s',
-  });
-  
-  if (!checkResponse(registerRes, 'Register', 200)) {
-    console.log('[WARN] Register failed, waiting before retry');
-    sleep(1);
-    return null;
-  }
-  
-  sleep(0.3);
-  
-  const loginRes = http.post(`${BASE_URL}/auth/login`, JSON.stringify({
-    username: username,
-    password: password,
-  }), {
-    headers: { 'Content-Type': 'application/json' },
-  });
-  
-  if (!checkResponse(loginRes, 'Login', 200)) {
-    return null;
-  }
-  
-  const body = loginRes.json();
-  const data = body.data || {};
-  authToken = data.accessToken || '';
-  
-  if (!authToken) {
-    console.log('[ERROR] No token in login response');
-    return null;
-  }
-  
-  return { username, password, token: authToken };
-}
-
-function tenantFlow() {
-  console.log('[TENANT] Starting tenant flow');
-  
-  if (tenantId) {
-    return { tenantId };
-  }
-  
-  if (!authToken) {
-    console.log('[WARN] No auth token for tenant flow');
-    return null;
-  }
-  
-  const tenantName = generateTenantName();
-  
-  const createPayload = {
-    name: tenantName,
-    address: '123 Test Street, Test City',
-    logo: http.file('dummy', 'logo.txt', 'text/plain'),
-  };
-
-  const createRes = http.post(`${BASE_URL}/tenants`, createPayload, {
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-    },
-  });
-  
-  if (!checkResponse(createRes, 'CreateTenant', 200)) {
-    return null;
-  }
-  
-  const body = createRes.json();
-  const data = body.data || {};
-  tenantId = data.id || '';
-  
-  if (!tenantId) {
-    console.log('[ERROR] No tenant ID returned');
-    return null;
-  }
-  
-  sleep(0.5);
-  
-  const getRes = http.get(`${BASE_URL}/tenants/${tenantId}`, {
-    headers: { 'Authorization': `Bearer ${authToken}` },
-  });
-  
-  checkResponse(getRes, 'GetTenant', 200);
-  
-  return { tenantId, name: tenantName };
-}
-
-function categoryFlow() {
-  console.log('[CATEGORY] Starting category flow');
-  
-  if (!authToken) return null;
-  
-  const getRes = http.get(`${BASE_URL}/categories`, {
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-      'X-Tenant-ID': tenantId,
-    },
-  });
-  
-  if (!checkResponse(getRes, 'GetCategories', 200)) {
-    return null;
-  }
-  
-  let currentCategoryId = null;
-
-  const listBody = getRes.json();
-  const listData = listBody.data || [];
-  if (Array.isArray(listData) && listData.length > 0) {
-    currentCategoryId = listData[0].id;
-  }
-  
-  if (!currentCategoryId) {
-    console.log('[CATEGORY] Not found, creating one...');
-    const categoryName = `Category_${Math.random().toString(36).substring(7)}`;
-    const createRes = http.post(
-      `${BASE_URL}/categories?name=${encodeURIComponent(categoryName)}&order=1`,
-      null,
-      {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'X-Tenant-ID': tenantId,
+  scenarios: IS_SMOKE
+    ? {
+        session_management: {
+          executor: 'per-vu-iterations',
+          exec: 'sessionManagement',
+          vus: 1,
+          iterations: 2,
+          maxDuration: '20s',
+          startTime: '0s',
+        },
+        order_processing: {
+          executor: 'per-vu-iterations',
+          exec: 'orderProcessing',
+          vus: 1,
+          iterations: 2,
+          maxDuration: '20s',
+          startTime: '1s',
+        },
+        menu_product: {
+          executor: 'per-vu-iterations',
+          exec: 'menuAndProduct',
+          vus: 1,
+          iterations: 4,
+          maxDuration: '20s',
+          startTime: '2s',
+        },
+        transaction: {
+          executor: 'per-vu-iterations',
+          exec: 'transactionFlow',
+          vus: 1,
+          iterations: 1,
+          maxDuration: '20s',
+          startTime: '3s',
         },
       }
-    );
-    
-    if (!checkResponse(createRes, 'CreateCategory', 201) && !checkResponse(createRes, 'CreateCategory', 200)) {
-      return null;
-    }
-    const body = createRes.json();
-    const data = body.data || {};
-    currentCategoryId = data.id || null;
-  }
-  
-  if (!currentCategoryId) {
-    console.log('[ERROR] No categoryId available after retrieving/creating categories');
-    return null;
-  }
-  
-  categoryId = currentCategoryId;
-  return { categoryId };
-}
+    : {
+        session_management: {
+          executor: 'ramping-vus',
+          exec: 'sessionManagement',
+          startVUs: 0,
+          stages: [
+            { duration: '20s', target: scaleTarget(40) },
+            { duration: '30s', target: scaleTarget(80) },
+            { duration: '20s', target: scaleTarget(120) },
+            { duration: '20s', target: 0 },
+          ],
+        },
+        order_processing: {
+          executor: 'ramping-vus',
+          exec: 'orderProcessing',
+          startVUs: 0,
+          stages: [
+            { duration: '20s', target: scaleTarget(20) },
+            { duration: '30s', target: scaleTarget(40) },
+            { duration: '20s', target: scaleTarget(60) },
+            { duration: '20s', target: 0 },
+          ],
+        },
+        menu_product: {
+          executor: 'ramping-vus',
+          exec: 'menuAndProduct',
+          startVUs: 0,
+          stages: [
+            { duration: '20s', target: scaleTarget(250) },
+            { duration: '30s', target: scaleTarget(500) },
+            { duration: '20s', target: scaleTarget(1000) },
+            { duration: '20s', target: 0 },
+          ],
+        },
+        transaction: {
+          executor: 'ramping-vus',
+          exec: 'transactionFlow',
+          startVUs: 0,
+          stages: [
+            { duration: '20s', target: scaleTarget(15) },
+            { duration: '30s', target: scaleTarget(30) },
+            { duration: '20s', target: scaleTarget(40) },
+            { duration: '20s', target: 0 },
+          ],
+        },
+      },
+};
 
-function productFlow() {
-  console.log('[PRODUCT] Starting product flow');
-  
-  if (!authToken || !tenantId) return null;
-  
-  const productPayload = {
-    categoryId: `${categoryId || 1}`,
-    name: generateProductName(),
-    price: `${Math.floor(Math.random() * 500000) + 10000}`,
-    description: 'Test product',
-    images: http.file('dummy product image', 'product.txt', 'text/plain'),
+function request(method, path, body, headers, parseBody) {
+  const res = http.request(method, `${BASE_URL}${path}`, body, {
+    headers: headers || {},
+    responseType: parseBody ? 'text' : undefined,
+    timeout: '15s',
+  });
+
+  let parsed = null;
+  if (parseBody && res.body) {
+    try {
+      parsed = JSON.parse(res.body);
+    } catch (_) {
+      parsed = null;
+    }
+  }
+
+  const ok = res.status >= 200 && res.status < 300 && (!parsed || parsed.code === 200);
+  businessErrorRate.add(!ok, { path, method });
+
+  if (!ok && IS_SMOKE) {
+    console.log(`[SMOKE-ERROR] ${method} ${path} status=${res.status} message=${parsed ? parsed.message : 'N/A'}`);
+  }
+
+  return {
+    ok,
+    res,
+    data: parsed ? parsed.data : null,
+    message: parsed ? parsed.message : '',
   };
-
-  const createRes = http.post(
-    `${BASE_URL}/products`,
-    productPayload,
-    {
-      headers: {
-        'Authorization': `Bearer ${authToken}`,
-        'X-Tenant-ID': tenantId,
-      },
-    }
-  );
-  
-  if (!checkResponse(createRes, 'CreateProduct', 200)) {
-    return null;
-  }
-  
-  const body = createRes.json();
-  const data = body.data || {};
-  productId = data.id || 0;
-  
-  sleep(0.3);
-  
-  const getRes = http.get(`${BASE_URL}/products`, {
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-      'X-Tenant-ID': tenantId,
-    },
-    params: { page: 0, size: 20 },
-  });
-  
-  checkResponse(getRes, 'GetProducts', 200);
-  
-  sleep(0.1);
-  
-  if (productId) {
-    const detailRes = http.get(`${BASE_URL}/products/${productId}`, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`,
-        'X-Tenant-ID': tenantId,
-      },
-    });
-    
-    checkResponse(detailRes, 'GetProductDetail', 200);
-  }
-  
-  return { productId, categoryId };
 }
 
-function tableFlow() {
-  console.log('[TABLE] Starting table flow');
-  
-  if (!authToken || !tenantId) return null;
-  
-  const createRes = http.post(
-    `${BASE_URL}/pos/tables?name=Table_${Math.floor(Math.random() * 100) + 1}`,
-    null,
-    {
-      headers: {
-        'Authorization': `Bearer ${authToken}`,
-        'X-Tenant-ID': tenantId,
-      },
-    }
-  );
-  
-  if (!checkResponse(createRes, 'CreateTable', 200)) {
-    return null;
-  }
-  
-  const body = createRes.json();
-  const data = body.data || {};
-  tableId = data.id || '';
-  
-  sleep(0.3);
-  
-  const getRes = http.get(`${BASE_URL}/pos/tables`, {
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-      'X-Tenant-ID': tenantId,
-    },
+function assertStep(result, checkName, detail) {
+  const passed = check(result.res, {
+    [checkName]: function () { return result.ok; },
   });
-  
-  checkResponse(getRes, 'GetTables', 200);
-  
-  return { tableId };
+
+  if (!passed && STRICT_MODE) {
+    fail(`${checkName} failed: ${detail || result.message || 'no detail'}`);
+  }
+  return passed;
 }
 
-function posSessionFlow() {
-  console.log('[SESSION] Starting POS session flow');
-  
-  if (!authToken || !tableId) return null;
-  
-  const createRes = http.post(
-    `${BASE_URL}/pos/sessions`,
-    JSON.stringify({
-      tableId: tableId,
-      note: 'Test session from k6',
-    }),
-    {
-      headers: {
-        'Authorization': `Bearer ${authToken}`,
-        'X-Tenant-ID': tenantId,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-  
-  if (!checkResponse(createRes, 'CreateSession', 200)) {
-    return null;
-  }
-  
-  const body = createRes.json();
-  const data = body.data || {};
-  sessionId = data.sessionId || 0;
-  
-  sleep(0.1);
-  
-  const getPendingRes = http.get(`${BASE_URL}/pos/sessions/pending`, {
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-      'X-Tenant-ID': tenantId,
-    },
-    params: { page: 0, size: 20 },
-  });
-  
-  checkResponse(getPendingRes, 'GetPendingSessions', 200);
-  
-  sleep(0.1);
-  
-  const getActiveRes = http.get(`${BASE_URL}/pos/sessions/active`, {
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-      'X-Tenant-ID': tenantId,
-    },
-    params: { page: 0, size: 20 },
-  });
-  
-  checkResponse(getActiveRes, 'GetActiveSessions', 200);
-  
-  return { sessionId };
+function authHeaders(ctx) {
+  return {
+    Authorization: `Bearer ${ctx.token}`,
+    'X-Tenant-ID': ctx.tenantId,
+  };
 }
 
-function posSessionItemsFlow() {
-  console.log('[SESSION-ITEMS] Starting session items flow');
-  
-  if (!authToken || !sessionId || !productId) return null;
-  
-  const addRes = http.post(
-    `${BASE_URL}/pos/sessions/${sessionId}/items`,
-    JSON.stringify({
-      items: [
-        {
-          productId: productId,
-          quantity: Math.floor(Math.random() * 3) + 1,
-          note: 'No spicy',
-        },
-      ],
-    }),
-    {
-      headers: {
-        'Authorization': `Bearer ${authToken}`,
-        'X-Tenant-ID': tenantId,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-  
-  checkResponse(addRes, 'AddSessionItems', 200);
-  
-  sleep(0.1);
-  
-  const getRes = http.get(`${BASE_URL}/pos/sessions/${sessionId}`, {
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-      'X-Tenant-ID': tenantId,
-    },
-  });
-  
-  checkResponse(getRes, 'GetSessionDetail', 200);
-  
-  return { sessionId };
+function jsonHeaders(ctx) {
+  return {
+    ...authHeaders(ctx),
+    'Content-Type': 'application/json',
+  };
 }
 
-function customerOrderFlow() {
-  console.log('[CUSTOMER-ORDER] Starting customer order flow');
-  
-  if (!tenantId || !tableId || !productId) {
-    console.log(`[WARN] Missing params for customer order: tenantId=${tenantId}, tableId=${tableId}, productId=${productId}`);
-    return null;
-  }
-  
-  const menuRes = http.get(`${CUSTOMERS_URL}/menu`, {
-    params: { tenantId: tenantId },
-  });
-  
-  checkResponse(menuRes, 'GetPublicMenu', 200);
-  
-  sleep(0.1);
-  
-  const infoRes = http.get(`${CUSTOMERS_URL}/info/${tableId}`);
-  
-  checkResponse(infoRes, 'GetTableInfo', 200);
-  
-  sleep(0.1);
-  
-  const orderRes = http.post(
-    `${CUSTOMERS_URL}/sessions`,
-    JSON.stringify({
-      tableId: tableId,
-      items: [
-        {
-          productId: productId,
-          quantity: Math.floor(Math.random() * 2) + 1,
-          note: 'Customer note',
-        },
-      ],
-      customerNote: 'Please serve quickly',
-    }),
-    {
-      headers: { 'Content-Type': 'application/json' },
-    }
-  );
-  
-  if (orderRes.status === 201 || orderRes.status === 200) {
-    const body = orderRes.json();
-    const data = body.data || {};
-    customerSessionId = data.sessionId || 0;
-    checkResponse(orderRes, 'CustomerOrder', orderRes.status);
-  } else {
-    checkResponse(orderRes, 'CustomerOrder', 201);
-  }
-  
-  sleep(0.1);
-  
-  if (customerSessionId) {
-    const getRes = http.get(`${CUSTOMERS_URL}/sessions/${customerSessionId}`);
-    checkResponse(getRes, 'GetCustomerOrder', 200);
-  }
-  
-  return { customerSessionId };
+function randomFrom(list) {
+  return list[Math.floor(Math.random() * list.length)];
 }
 
-function paymentFlow() {
-  console.log('[PAYMENT] Starting payment flow');
-  
-  if (!tenantId) return null;
-  
-  const methodRes = http.get(`${PUBLIC_URL}/payment/methods/${tenantId}`);
-  checkResponse(methodRes, 'GetPaymentMethods', 200);
-  
+function buildTableSeedNames() {
+  const desired = IS_SMOKE ? 8 : Math.max(60, Math.floor(300 * STRESS_SCALE));
+  const names = [];
+  for (let i = 0; i < desired; i += 1) {
+    names.push(`${TABLE_NAMES[i % TABLE_NAMES.length]}-${String(i + 1).padStart(3, '0')}`);
+  }
+  return names;
+}
+
+function vuPick(list, offset) {
+  return list[(exec.vu.idInTest + exec.scenario.iterationInTest + (offset || 0)) % list.length];
+}
+
+function listTables(ctx) {
+  return request('GET', '/api/pos/tables', null, authHeaders(ctx), true);
+}
+
+function pickAvailableTable(ctx) {
+  const tablesRes = listTables(ctx);
+  if (!tablesRes.ok || !Array.isArray(tablesRes.data)) return null;
+
+  const candidates = tablesRes.data.filter(function (t) {
+    return String(t.status || '').toUpperCase() === 'AVAILABLE' && (t.sessionId === null || t.sessionId === undefined);
+  });
+  if (!candidates.length) return null;
+  return String(randomFrom(candidates).id);
+}
+
+function getSessionDetail(ctx, sessionId) {
+  return request('GET', `/api/pos/sessions/${sessionId}`, null, authHeaders(ctx), true);
+}
+
+function isPendingSession(ctx, sessionId) {
+  const pending = request('GET', '/api/pos/sessions/pending', null, authHeaders(ctx), true);
+  if (!pending.ok || !Array.isArray(pending.data)) return false;
+  return pending.data.some(function (s) {
+    return Number(s.sessionId) === Number(sessionId);
+  });
+}
+
+function findPendingItemId(sessionData) {
+  if (!sessionData || !Array.isArray(sessionData.orders)) return null;
+
+  for (const order of sessionData.orders) {
+    if (!order || !Array.isArray(order.items)) continue;
+    for (const item of order.items) {
+      if (item && item.id !== undefined && String(item.status || '').toUpperCase() === 'PENDING') {
+        return item.id;
+      }
+    }
+  }
   return null;
 }
 
-function notificationFlow() {
-  console.log('[NOTIFICATION] Starting notification flow');
-  
-  if (!authToken) return null;
-  
-  const getRes = http.get(`${BASE_URL}/notifications`, {
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-      'X-Tenant-ID': tenantId,
-    },
-    params: { page: 0, size: 20 },
-  });
-  
-  checkResponse(getRes, 'GetNotifications', 200);
-  
-  sleep(0.1);
-  
-  const unreadRes = http.get(`${BASE_URL}/notifications/unread`, {
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-      'X-Tenant-ID': tenantId,
-    },
-  });
-  
-  checkResponse(unreadRes, 'GetUnreadNotifications', 200);
-  
-  sleep(0.1);
-  
-  const countRes = http.get(`${BASE_URL}/notifications/unread/count`, {
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-      'X-Tenant-ID': tenantId,
-    },
-  });
-  
-  checkResponse(countRes, 'GetNotificationCount', 200);
-  
-  return null;
-}
+export function setup() {
+  const suffix = `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+  const username = `k6_owner_${suffix}`;
+  const password = seed.ownerPassword || 'Password@123';
+  const email = `k6_${suffix}@example.com`;
 
-function reportingFlow() {
-  console.log('[REPORTING] Starting reporting flow');
-  
-  if (!authToken) return null;
-  
-  const revenueRes = http.get(`${BASE_URL}/reports/revenue`, {
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-      'X-Tenant-ID': tenantId,
-    },
-    params: { from: '2024-01-01', to: '2024-12-31' },
-  });
-  
-  checkResponse(revenueRes, 'GetRevenueReport', 200);
-  
-  sleep(0.1);
-  
-  const topProductRes = http.get(`${BASE_URL}/reports/top-products`, {
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-      'X-Tenant-ID': tenantId,
-    },
-    params: { limit: 5 },
-  });
-  
-  checkResponse(topProductRes, 'GetTopProducts', 200);
-  
-  sleep(0.1);
-  
-  const peakHoursRes = http.get(`${BASE_URL}/reports/peak-hours`, {
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-      'X-Tenant-ID': tenantId,
-    },
-  });
-  
-  checkResponse(peakHoursRes, 'GetPeakHours', 200);
-  
-  return null;
-}
+  const register = request(
+    'POST',
+    '/api/auth/register',
+    JSON.stringify({ username, password, email, fullName: 'K6 Owner' }),
+    { 'Content-Type': 'application/json' },
+    true
+  );
+  if (!register.ok) fail(`register failed: ${register.message}`);
 
-export function integrationTest() {
-  console.log('========== [INTEGRATION TEST] Complete User Journey ==============');
-  
-  authFlow();
-  sleep(0.5);
-  
-  tenantFlow();
-  sleep(0.5);
-  
-  categoryFlow();
-  sleep(0.3);
-  
-  productFlow();
-  sleep(0.5);
-  
-  tableFlow();
-  sleep(0.3);
-  
-  posSessionFlow();
-  sleep(0.3);
-  
-  posSessionItemsFlow();
-  sleep(0.3);
-  
-  customerOrderFlow();
-  sleep(0.3);
-  
-  paymentFlow();
-  sleep(0.3);
-}
+  const login = request(
+    'POST',
+    '/api/auth/login',
+    JSON.stringify({ username, password }),
+    { 'Content-Type': 'application/json' },
+    true
+  );
+  if (!login.ok || !login.data || !login.data.accessToken) fail('login failed');
 
-export function functionalTest() {
-  console.log('========== [FUNCTIONAL TEST] All Endpoints ======================');
-  
-  authFlow();
-  sleep(0.3);
-  
-  if (authToken) {
-    tenantFlow();
-    sleep(0.3);
-    
-    categoryFlow();
-    sleep(0.2);
-    
-    productFlow();
-    sleep(0.3);
-    
-    tableFlow();
-    sleep(0.2);
-    
-    posSessionFlow();
-    sleep(0.2);
-    
-    posSessionItemsFlow();
-    sleep(0.2);
-    
-    notificationFlow();
-    sleep(0.2);
-    
-    reportingFlow();
-    sleep(0.2);
+  const token = login.data.accessToken;
+  const tenantReq = {
+    name: `K6 Tenant ${suffix}`,
+    address: 'HCM',
+    logo: http.file('k6', 'logo.txt', 'text/plain'),
+  };
+  const tenant = request('POST', '/api/tenants', tenantReq, { Authorization: `Bearer ${token}` }, true);
+  if (!tenant.ok || !tenant.data || !tenant.data.id) fail('create tenant failed');
+
+  const tenantId = tenant.data.id;
+  const ctx = { token, tenantId };
+
+  const categories = request('GET', '/api/categories', null, authHeaders(ctx), true);
+  if (!categories.ok || !Array.isArray(categories.data) || categories.data.length === 0) {
+    fail('cannot fetch default category');
   }
-  
-  customerOrderFlow();
-  sleep(0.2);
-  
-  paymentFlow();
-  sleep(0.2);
+  const categoryId = categories.data[0].id;
+
+  const tableIds = [];
+  for (const tableName of buildTableSeedNames()) {
+    const t = request('POST', `/api/pos/tables?name=${encodeURIComponent(`${tableName}-${suffix.slice(-4)}`)}`, null, authHeaders(ctx), true);
+    if (t.ok && t.data && t.data.id) tableIds.push(String(t.data.id));
+  }
+  if (!tableIds.length) fail('cannot create any table');
+
+  const productIds = [];
+  for (const p of PRODUCT_SEEDS) {
+    const payload = {
+      categoryId: String(categoryId),
+      name: `${p.name}-${suffix.slice(-4)}`,
+      price: String(p.price),
+      description: 'k6 seeded product',
+      images: http.file('k6-product', 'p.txt', 'text/plain'),
+    };
+    const pr = request('POST', '/api/products', payload, authHeaders(ctx), true);
+    if (pr.ok && pr.data && pr.data.id) productIds.push(Number(pr.data.id));
+  }
+  if (!productIds.length) fail('cannot create any product');
+
+  return {
+    token,
+    tenantId,
+    tableIds,
+    productIds,
+    paymentMethod: seed.paymentMethod || 'CASH',
+  };
 }
 
-export function stressTest() {
-  console.log('========== [STRESS TEST] Random API Calls ======================');
-  
-  const scenario = Math.random();
-  
-  if (scenario < 0.2) {
-    authFlow();
-  } else if (scenario < 0.4) {
-    if (!authToken) authFlow();
-    if (authToken) {
-      tenantFlow();
-      categoryFlow();
-      productFlow();
+export function sessionManagement(data) {
+  const ctx = { token: data.token, tenantId: data.tenantId };
+
+  group('session open/close', function () {
+    const tableId = pickAvailableTable(ctx) || vuPick(data.tableIds, 0);
+
+    const openRes = request(
+      'POST',
+      '/api/pos/sessions',
+      JSON.stringify({ tableId, note: 'k6 open session' }),
+      jsonHeaders(ctx),
+      true
+    );
+    assertStep(openRes, 'open session success', 'POST /api/pos/sessions');
+    if (!openRes.ok || !openRes.data || !openRes.data.sessionId) return;
+
+    sessionOpenCount.add(1);
+    const sessionId = openRes.data.sessionId;
+
+    const payRes = request(
+      'POST',
+      `/api/pos/sessions/${sessionId}/pay`,
+      JSON.stringify({ method: data.paymentMethod }),
+      jsonHeaders(ctx),
+      true
+    );
+    assertStep(payRes, 'close session success', `POST /api/pos/sessions/${sessionId}/pay`);
+    if (payRes.ok) sessionCloseCount.add(1);
+  });
+}
+
+export function orderProcessing(data) {
+  const ctx = { token: data.token, tenantId: data.tenantId };
+
+  group('order processing', function () {
+    const tableId = pickAvailableTable(ctx) || vuPick(data.tableIds, 1);
+    const p1 = Number(vuPick(data.productIds, 2));
+    const p2 = Number(vuPick(data.productIds, 3));
+
+    // Public customer side flow: create + status check only.
+    const customer = request(
+      'POST',
+      '/api/pos/public/sessions',
+      JSON.stringify({ tableId, items: [{ productId: p1, quantity: 1 }], customerNote: 'k6 customer order' }),
+      { 'Content-Type': 'application/json' },
+      true
+    );
+    assertStep(customer, 'customer order success', 'POST /api/pos/public/sessions');
+
+    if (customer.ok && customer.data && customer.data.sessionId) {
+      const customerStatus = request('GET', `/api/pos/public/sessions/${customer.data.sessionId}`, null, null, true);
+      assertStep(customerStatus, 'customer status success', `GET /api/pos/public/sessions/${customer.data.sessionId}`);
     }
-  } else if (scenario < 0.6) {
-    if (!authToken) authFlow();
-    if (authToken && !tenantId) tenantFlow();
-    if (authToken && tenantId) {
-      tableFlow();
-      posSessionFlow();
-    }
-  } else if (scenario < 0.8) {
-    customerOrderFlow();
-  } else {
-    paymentFlow();
-  }
-  
-  sleep(Math.random() * 1.5);
+
+    // Staff internal flow: open session, add/update/delete items.
+    const staffTable = pickAvailableTable(ctx) || vuPick(data.tableIds, 2);
+    const staffOpen = request(
+      'POST',
+      '/api/pos/sessions',
+      JSON.stringify({ tableId: staffTable, note: 'k6 staff order flow' }),
+      jsonHeaders(ctx),
+      true
+    );
+    assertStep(staffOpen, 'staff open session success', 'POST /api/pos/sessions');
+    if (!staffOpen.ok || !staffOpen.data || !staffOpen.data.sessionId) return;
+
+    const sessionId = staffOpen.data.sessionId;
+    const addStaff = request(
+      'POST',
+      `/api/pos/sessions/${sessionId}/items`,
+      JSON.stringify({ items: [{ productId: p1, quantity: 1 }, { productId: p2, quantity: 1 }] }),
+      jsonHeaders(ctx),
+      true
+    );
+    assertStep(addStaff, 'staff add item success', `POST /api/pos/sessions/${sessionId}/items`);
+    if (!addStaff.ok) return;
+
+    const detail = getSessionDetail(ctx, sessionId);
+    assertStep(detail, 'staff get session detail success', `GET /api/pos/sessions/${sessionId}`);
+    if (!detail.ok) return;
+    const itemId = findPendingItemId(detail.data);
+    if (!itemId) return;
+
+    const upd = request(
+      'PATCH',
+      `/api/pos/sessions/${sessionId}/items/${itemId}`,
+      JSON.stringify({ quantity: 3 }),
+      jsonHeaders(ctx),
+      true
+    );
+    assertStep(upd, 'update quantity success', `PATCH /api/pos/sessions/${sessionId}/items/${itemId}`);
+
+    const del = request('DELETE', `/api/pos/sessions/${sessionId}/items/${itemId}`, null, authHeaders(ctx), true);
+    assertStep(del, 'remove item success', `DELETE /api/pos/sessions/${sessionId}/items/${itemId}`);
+  });
 }
 
-export default function main() {
-  const scenario = __ENV.SCENARIO || 'stress';
-  
-  if (scenario === 'integration') {
-    integrationTest();
-  } else if (scenario === 'functional') {
-    functionalTest();
-  } else {
-    stressTest();
-  }
+export function menuAndProduct(data) {
+  const ctx = { token: data.token, tenantId: data.tenantId };
+
+  group('menu and product search', function () {
+    const term = vuPick(SEARCH_TERMS, 1);
+
+    const m = request('GET', `/api/pos/public/menu?tenantId=${encodeURIComponent(data.tenantId)}`, null, null, true);
+    assertStep(m, 'public menu success', 'GET /api/pos/public/menu');
+
+    const c = request('GET', '/api/categories', null, authHeaders(ctx), true);
+    assertStep(c, 'categories success', 'GET /api/categories');
+
+    const p = request('GET', `/api/products?page=0&size=50&name=${encodeURIComponent(term)}`, null, authHeaders(ctx), true);
+    assertStep(p, 'products success', 'GET /api/products');
+  });
+}
+
+export function transactionFlow(data) {
+  const ctx = { token: data.token, tenantId: data.tenantId };
+
+  group('transaction flow', function () {
+    const tableId = pickAvailableTable(ctx) || vuPick(data.tableIds, 4);
+    const productId = Number(vuPick(data.productIds, 0));
+
+    const opened = request(
+      'POST',
+      '/api/pos/sessions',
+      JSON.stringify({ tableId, note: 'k6 transaction flow' }),
+      jsonHeaders(ctx),
+      true
+    );
+    assertStep(opened, 'transaction open session success', 'POST /api/pos/sessions');
+    if (!opened.ok || !opened.data || !opened.data.sessionId) return;
+
+    const sessionId = opened.data.sessionId;
+
+    const add = request(
+      'POST',
+      `/api/pos/sessions/${sessionId}/items`,
+      JSON.stringify({ items: [{ productId, quantity: 2 }] }),
+      jsonHeaders(ctx),
+      true
+    );
+    assertStep(add, 'transaction add item success', `POST /api/pos/sessions/${sessionId}/items`);
+    if (!add.ok) return;
+
+    const requestBill = request('POST', `/api/pos/public/sessions/${sessionId}/request-payment`, null, null, true);
+    assertStep(requestBill, 'request payment success', `POST /api/pos/public/sessions/${sessionId}/request-payment`);
+
+    const pay = request(
+      'POST',
+      `/api/pos/sessions/${sessionId}/pay`,
+      JSON.stringify({ method: data.paymentMethod }),
+      jsonHeaders(ctx),
+      true
+    );
+    assertStep(pay, 'pay session success', `POST /api/pos/sessions/${sessionId}/pay`);
+  });
+}
+
+export default function () {
+  fail('Use named scenarios only.');
 }
