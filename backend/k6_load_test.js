@@ -204,6 +204,29 @@ function vuPick(list, offset) {
   return list[(exec.vu.idInTest + exec.scenario.iterationInTest + (offset || 0)) % list.length];
 }
 
+function listTables(ctx) {
+  return request('GET', '/api/pos/tables', null, authHeaders(ctx), true);
+}
+
+function pickAvailableTable(ctx, preferredTableIds) {
+  const tablesRes = listTables(ctx);
+  if (!tablesRes.ok || !Array.isArray(tablesRes.data)) return null;
+
+  const preferred = Array.isArray(preferredTableIds) && preferredTableIds.length
+    ? new Set(preferredTableIds.map(function (id) { return String(id); }))
+    : null;
+
+  const candidates = tablesRes.data.filter(function (t) {
+    const id = String(t.id);
+    const inPreferredPool = !preferred || preferred.has(id);
+    return inPreferredPool
+      && String(t.status || '').toUpperCase() === 'AVAILABLE'
+      && (t.sessionId === null || t.sessionId === undefined);
+  });
+  if (!candidates.length) return null;
+  return String(randomFrom(candidates).id);
+}
+
 function getSessionDetail(ctx, sessionId) {
   return request('GET', `/api/pos/sessions/${sessionId}`, null, authHeaders(ctx), true);
 }
@@ -279,6 +302,11 @@ export function setup() {
   }
   if (!tableIds.length) fail('cannot create any table');
 
+  const qrPoolSize = Math.max(2, Math.floor(tableIds.length * 0.3));
+  const qrTableIds = tableIds.slice(0, qrPoolSize);
+  const opsTableIds = tableIds.slice(qrPoolSize);
+  const effectiveOpsTableIds = opsTableIds.length ? opsTableIds : tableIds;
+
   const productIds = [];
   for (const p of PRODUCT_SEEDS) {
     const payload = {
@@ -297,6 +325,8 @@ export function setup() {
     token,
     tenantId,
     tableIds,
+    qrTableIds,
+    opsTableIds: effectiveOpsTableIds,
     productIds,
     paymentMethod: seed.paymentMethod || 'CASH',
   };
@@ -304,9 +334,10 @@ export function setup() {
 
 export function sessionManagement(data) {
   const ctx = { token: data.token, tenantId: data.tenantId };
+  const opsTableIds = Array.isArray(data.opsTableIds) && data.opsTableIds.length ? data.opsTableIds : data.tableIds;
 
   group('session open/close', function () {
-    const tableId = vuPick(data.tableIds, 0);
+    const tableId = pickAvailableTable(ctx, opsTableIds) || vuPick(opsTableIds, 0);
 
     const openRes = request(
       'POST',
@@ -335,9 +366,11 @@ export function sessionManagement(data) {
 
 export function orderProcessing(data) {
   const ctx = { token: data.token, tenantId: data.tenantId };
+  const qrTableIds = Array.isArray(data.qrTableIds) && data.qrTableIds.length ? data.qrTableIds : data.tableIds;
+  const opsTableIds = Array.isArray(data.opsTableIds) && data.opsTableIds.length ? data.opsTableIds : data.tableIds;
 
   group('order processing', function () {
-    const tableId = vuPick(data.tableIds, 1);
+    const tableId = vuPick(qrTableIds, 1);
     const p1 = Number(vuPick(data.productIds, 2));
     const p2 = Number(vuPick(data.productIds, 3));
 
@@ -357,7 +390,7 @@ export function orderProcessing(data) {
     }
 
     // Staff internal flow: open session, add/update/delete items.
-    const staffTable = vuPick(data.tableIds, 2);
+    const staffTable = pickAvailableTable(ctx, opsTableIds) || vuPick(opsTableIds, 2);
     const staffOpen = request(
       'POST',
       '/api/pos/sessions',
@@ -418,9 +451,10 @@ export function menuAndProduct(data) {
 
 export function transactionFlow(data) {
   const ctx = { token: data.token, tenantId: data.tenantId };
+  const opsTableIds = Array.isArray(data.opsTableIds) && data.opsTableIds.length ? data.opsTableIds : data.tableIds;
 
   group('transaction flow', function () {
-    const tableId = vuPick(data.tableIds, 4);
+    const tableId = pickAvailableTable(ctx, opsTableIds) || vuPick(opsTableIds, 4);
     const productId = Number(vuPick(data.productIds, 0));
 
     const opened = request(
