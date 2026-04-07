@@ -50,6 +50,7 @@ function scaleTarget(value) {
 export const options = {
   discardResponseBodies: true,
   summaryTrendStats: ['avg', 'med', 'p(90)', 'p(95)', 'p(99)', 'max'],
+  setupTimeout: '240s',
   thresholds: {
     http_req_failed: ['rate<0.01'],
     http_req_duration: ['p(95)<2000'],
@@ -72,10 +73,10 @@ export const options = {
           exec: 'groupOrderFlow',
           startVUs: 0,
           stages: [
-            { duration: '30s', target: scaleTarget(20) },
-            { duration: '60s', target: scaleTarget(40) },
-            { duration: '90s', target: scaleTarget(60) },
-            { duration: '60s', target: 0 },
+            { duration: '60s', target: scaleTarget(20) },
+            { duration: '120s', target: scaleTarget(40) },
+            { duration: '180s', target: scaleTarget(60) },
+            { duration: '120s', target: 0 },
           ],
         },
         concurrent_table_ops: {
@@ -83,7 +84,7 @@ export const options = {
           exec: 'concurrentTableOperations',
           vus: CONCURRENT_TABLE_VUS,
           iterations: CONCURRENT_TABLE_ITERATIONS,
-          maxDuration: '480s',
+          maxDuration: '600s',
           startTime: '30s',
         },
       },
