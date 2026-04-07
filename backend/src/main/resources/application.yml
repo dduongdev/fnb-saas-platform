@@ -22,7 +22,7 @@ spring:
     password: ${DB_PASSWORD}
 
     hikari:
-      maximum-pool-size: 200
+      maximum-pool-size: 150
       minimum-idle: 10
       idle-timeout: 30000
       max-lifetime: 1800000
@@ -66,5 +66,5 @@ minio:
 
 logging:
   level:
-    com.project.fnb: DEBUG
+    com.project.fnb: WARN
     org.springframework.security: INFO
