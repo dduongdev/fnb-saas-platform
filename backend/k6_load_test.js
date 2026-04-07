@@ -100,10 +100,10 @@ export const options = {
           exec: 'orderProcessing',
           startVUs: 0,
           stages: [
-            { duration: '20s', target: scaleTarget(20) },
             { duration: '30s', target: scaleTarget(40) },
-            { duration: '20s', target: scaleTarget(60) },
-            { duration: '20s', target: 0 },
+            { duration: '40s', target: scaleTarget(80) },
+            { duration: '30s', target: scaleTarget(120) },
+            { duration: '30s', target: 0 },
           ],
         },
         menu_product: {
@@ -122,10 +122,10 @@ export const options = {
           exec: 'transactionFlow',
           startVUs: 0,
           stages: [
-            { duration: '20s', target: scaleTarget(15) },
             { duration: '30s', target: scaleTarget(30) },
-            { duration: '20s', target: scaleTarget(40) },
-            { duration: '20s', target: 0 },
+            { duration: '40s', target: scaleTarget(60) },
+            { duration: '30s', target: scaleTarget(80) },
+            { duration: '30s', target: 0 },
           ],
         },
       },
