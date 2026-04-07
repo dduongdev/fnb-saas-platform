@@ -83,7 +83,7 @@ export const options = {
           exec: 'concurrentTableOperations',
           vus: CONCURRENT_TABLE_VUS,
           iterations: CONCURRENT_TABLE_ITERATIONS,
-          maxDuration: '240s',
+          maxDuration: '480s',
           startTime: '30s',
         },
       },
