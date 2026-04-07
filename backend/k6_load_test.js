@@ -50,81 +50,24 @@ export const options = {
   },
   scenarios: IS_SMOKE
     ? {
-        session_management: {
+        full_pos_flow: {
           executor: 'per-vu-iterations',
-          exec: 'sessionManagement',
+          exec: 'fullPosFlow',
           vus: 1,
-          iterations: 2,
-          maxDuration: '20s',
+          iterations: 3,
+          maxDuration: '60s',
           startTime: '0s',
-        },
-        order_processing: {
-          executor: 'per-vu-iterations',
-          exec: 'orderProcessing',
-          vus: 1,
-          iterations: 2,
-          maxDuration: '20s',
-          startTime: '1s',
-        },
-        menu_product: {
-          executor: 'per-vu-iterations',
-          exec: 'menuAndProduct',
-          vus: 1,
-          iterations: 4,
-          maxDuration: '20s',
-          startTime: '2s',
-        },
-        transaction: {
-          executor: 'per-vu-iterations',
-          exec: 'transactionFlow',
-          vus: 1,
-          iterations: 1,
-          maxDuration: '20s',
-          startTime: '3s',
         },
       }
     : {
-        session_management: {
+        full_pos_flow: {
           executor: 'ramping-vus',
-          exec: 'sessionManagement',
-          startVUs: 0,
-          stages: [
-            { duration: '20s', target: scaleTarget(40) },
-            { duration: '30s', target: scaleTarget(80) },
-            { duration: '20s', target: scaleTarget(120) },
-            { duration: '20s', target: 0 },
-          ],
-        },
-        order_processing: {
-          executor: 'ramping-vus',
-          exec: 'orderProcessing',
-          startVUs: 0,
-          stages: [
-            { duration: '30s', target: scaleTarget(40) },
-            { duration: '40s', target: scaleTarget(80) },
-            { duration: '30s', target: scaleTarget(120) },
-            { duration: '30s', target: 0 },
-          ],
-        },
-        menu_product: {
-          executor: 'ramping-vus',
-          exec: 'menuAndProduct',
-          startVUs: 0,
-          stages: [
-            { duration: '20s', target: scaleTarget(250) },
-            { duration: '30s', target: scaleTarget(500) },
-            { duration: '20s', target: scaleTarget(1000) },
-            { duration: '20s', target: 0 },
-          ],
-        },
-        transaction: {
-          executor: 'ramping-vus',
-          exec: 'transactionFlow',
+          exec: 'fullPosFlow',
           startVUs: 0,
           stages: [
             { duration: '30s', target: scaleTarget(30) },
-            { duration: '40s', target: scaleTarget(60) },
-            { duration: '30s', target: scaleTarget(80) },
+            { duration: '60s', target: scaleTarget(60) },
+            { duration: '60s', target: scaleTarget(120) },
             { duration: '30s', target: 0 },
           ],
         },
@@ -208,7 +151,8 @@ function randomFrom(list) {
 }
 
 function buildTableSeedNames() {
-  const desired = IS_SMOKE ? 8 : Math.max(60, Math.floor(300 * STRESS_SCALE));
+  // Keep table pool larger than max concurrent VUs so each VU can stick to a dedicated table.
+  const desired = IS_SMOKE ? 8 : Math.max(60, scaleTarget(160));
   const names = [];
   for (let i = 0; i < desired; i += 1) {
     names.push(`${TABLE_NAMES[i % TABLE_NAMES.length]}-${String(i + 1).padStart(3, '0')}`);
@@ -218,6 +162,12 @@ function buildTableSeedNames() {
 
 function vuPick(list, offset) {
   return list[(exec.vu.idInTest + exec.scenario.iterationInTest + (offset || 0)) % list.length];
+}
+
+function dedicatedVuTableId(tableIds, offset) {
+  if (!Array.isArray(tableIds) || !tableIds.length) return null;
+  const vuIndex = Math.max(0, exec.vu.idInTest - 1);
+  return String(tableIds[(vuIndex + (offset || 0)) % tableIds.length]);
 }
 
 function listTables(ctx) {
@@ -557,6 +507,76 @@ export function transactionFlow(data) {
       true
     );
     assertStep(pay, 'pay session success', `POST /api/pos/sessions/${sessionId}/pay`);
+  });
+}
+
+export function fullPosFlow(data) {
+  const ctx = { token: data.token, tenantId: data.tenantId };
+  const tableIds = Array.isArray(data.opsTableIds) && data.opsTableIds.length ? data.opsTableIds : data.tableIds;
+
+  group('full pos flow', function () {
+    const tableId = dedicatedVuTableId(tableIds, 0) || pickAvailableTable(ctx, tableIds) || vuPick(tableIds, 0);
+    const p1 = Number(vuPick(data.productIds, 0));
+    const p2 = Number(vuPick(data.productIds, 1));
+    const term = vuPick(SEARCH_TERMS, 0);
+
+    const menu = request('GET', `/api/pos/public/menu?tenantId=${encodeURIComponent(data.tenantId)}`, null, publicHeaders(ctx), true);
+    assertStep(menu, 'full flow public menu success', 'GET /api/pos/public/menu');
+
+    const products = request('GET', `/api/products?page=0&size=20&name=${encodeURIComponent(term)}`, null, authHeaders(ctx), true);
+    assertStep(products, 'full flow search products success', 'GET /api/products');
+
+    const openRes = request(
+      'POST',
+      '/api/pos/sessions',
+      JSON.stringify({ tableId, note: `k6 full flow vu=${exec.vu.idInTest}` }),
+      jsonHeaders(ctx),
+      true
+    );
+    assertStep(openRes, 'full flow open session success', 'POST /api/pos/sessions');
+    if (!openRes.ok || !openRes.data || !openRes.data.sessionId) return;
+
+    sessionOpenCount.add(1);
+    const sessionId = openRes.data.sessionId;
+
+    const addRes = request(
+      'POST',
+      `/api/pos/sessions/${sessionId}/items`,
+      JSON.stringify({ items: [{ productId: p1, quantity: 1 }, { productId: p2, quantity: 2 }] }),
+      jsonHeaders(ctx),
+      true
+    );
+    assertStep(addRes, 'full flow add items success', `POST /api/pos/sessions/${sessionId}/items`);
+    if (!addRes.ok) return;
+
+    const detail = getSessionDetail(ctx, sessionId);
+    assertStep(detail, 'full flow get session detail success', `GET /api/pos/sessions/${sessionId}`);
+    if (detail.ok) {
+      const itemId = findPendingItemId(detail.data);
+      if (itemId) {
+        const upd = request(
+          'PATCH',
+          `/api/pos/sessions/${sessionId}/items/${itemId}`,
+          JSON.stringify({ quantity: 3 }),
+          jsonHeaders(ctx),
+          true
+        );
+        assertStep(upd, 'full flow update quantity success', `PATCH /api/pos/sessions/${sessionId}/items/${itemId}`);
+      }
+    }
+
+    const requestBill = request('POST', `/api/pos/public/sessions/${sessionId}/request-payment`, null, publicHeaders(ctx), true);
+    assertStep(requestBill, 'full flow request payment success', `POST /api/pos/public/sessions/${sessionId}/request-payment`);
+
+    const payRes = request(
+      'POST',
+      `/api/pos/sessions/${sessionId}/pay`,
+      JSON.stringify({ method: data.paymentMethod }),
+      jsonHeaders(ctx),
+      true
+    );
+    assertStep(payRes, 'full flow pay session success', `POST /api/pos/sessions/${sessionId}/pay`);
+    if (payRes.ok) sessionCloseCount.add(1);
   });
 }
 
