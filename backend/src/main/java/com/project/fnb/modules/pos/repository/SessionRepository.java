@@ -37,7 +37,9 @@ public interface SessionRepository extends JpaRepository<ServingSession, Long> {
            "LEFT JOIN FETCH s.tables t " +
            "LEFT JOIN FETCH s.orders o " +
            "LEFT JOIN FETCH o.items i " +
-           "LEFT JOIN FETCH i.product " +
+           "LEFT JOIN FETCH i.originalTable " +
+           "LEFT JOIN FETCH i.product p " +
+           "LEFT JOIN FETCH p.images " +
            "WHERE s.id = :id AND s.status = 'ACTIVE'")
     Optional<ServingSession> findActiveByIdWithDetails(@Param("id") Long id);
 
@@ -68,7 +70,9 @@ public interface SessionRepository extends JpaRepository<ServingSession, Long> {
            "LEFT JOIN FETCH s.tables " +
            "LEFT JOIN FETCH s.orders o " +
            "LEFT JOIN FETCH o.items i " +
-           "LEFT JOIN FETCH i.product " +
+           "LEFT JOIN FETCH i.originalTable " +
+           "LEFT JOIN FETCH i.product p " +
+           "LEFT JOIN FETCH p.images " +
            "WHERE s.id = :id")
     Optional<ServingSession> findByIdWithDetails(@Param("id") Long id);
 
@@ -102,7 +106,9 @@ public interface SessionRepository extends JpaRepository<ServingSession, Long> {
            "LEFT JOIN FETCH s.tables t " +
            "LEFT JOIN FETCH s.orders o " +
            "LEFT JOIN FETCH o.items i " +
-           "LEFT JOIN FETCH i.product " +
+           "LEFT JOIN FETCH i.originalTable " +
+           "LEFT JOIN FETCH i.product p " +
+           "LEFT JOIN FETCH p.images " +
            "WHERE s.status = 'PENDING' " +
            "ORDER BY s.startedAt ASC")
     List<ServingSession> findPendingSessions();
@@ -122,18 +128,25 @@ public interface SessionRepository extends JpaRepository<ServingSession, Long> {
            "LEFT JOIN FETCH s.tables t " +
            "LEFT JOIN FETCH s.orders o " +
            "LEFT JOIN FETCH o.items i " +
-           "LEFT JOIN FETCH i.product " +
+           "LEFT JOIN FETCH i.originalTable " +
+           "LEFT JOIN FETCH i.product p " +
+           "LEFT JOIN FETCH p.images " +
            "WHERE s.status = 'ACTIVE' " +
            "ORDER BY s.startedAt DESC")
     List<ServingSession> findActiveSessions();
 
-    @Query("SELECT s FROM ServingSession s " +
+    @Query("SELECT s.id FROM ServingSession s ORDER BY s.startedAt DESC")
+    Page<Long> findSessionHistoryIds(Pageable pageable);
+
+    @Query("SELECT DISTINCT s FROM ServingSession s " +
            "LEFT JOIN FETCH s.tables t " +
            "LEFT JOIN FETCH s.orders o " +
            "LEFT JOIN FETCH o.items i " +
-           "LEFT JOIN FETCH i.product " +
-           "ORDER BY s.startedAt DESC")
-    Page<ServingSession> findSessionHistory(Pageable pageable);
+           "LEFT JOIN FETCH i.originalTable " +
+           "LEFT JOIN FETCH i.product p " +
+           "LEFT JOIN FETCH p.images " +
+           "WHERE s.id IN :ids")
+    List<ServingSession> findSessionHistoryByIdsWithDetails(@Param("ids") List<Long> ids);
 
     /**
      * Lấy tất cả session ACTIVE với orders, items, và products (eager load hoàn chỉnh).
@@ -151,6 +164,7 @@ public interface SessionRepository extends JpaRepository<ServingSession, Long> {
            "LEFT JOIN FETCH s.tables " +
            "LEFT JOIN FETCH s.orders o " +
            "LEFT JOIN FETCH o.items oi " +
+           "LEFT JOIN FETCH oi.originalTable " +
            "LEFT JOIN FETCH oi.product " +
            "WHERE s.status = 'ACTIVE' " +
            "ORDER BY s.createdAt DESC")

@@ -24,13 +24,21 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     /**
      * Lấy tất cả notifications sắp xếp theo thời gian mới nhất
      */
-    @Query("SELECT n FROM Notification n ORDER BY n.createdAt DESC")
+    @Query(value = "SELECT n FROM Notification n " +
+            "LEFT JOIN FETCH n.session " +
+            "LEFT JOIN FETCH n.table " +
+            "ORDER BY n.createdAt DESC",
+           countQuery = "SELECT COUNT(n) FROM Notification n")
     Page<Notification> findAllByTenantOrderByCreatedAtDesc(Pageable pageable);
 
     /**
      * Lấy notifications chưa đọc
      */
-    @Query("SELECT n FROM Notification n WHERE n.isRead = false ORDER BY n.createdAt DESC")
+        @Query("SELECT n FROM Notification n " +
+            "LEFT JOIN FETCH n.session " +
+            "LEFT JOIN FETCH n.table " +
+            "WHERE n.isRead = false " +
+            "ORDER BY n.createdAt DESC")
     List<Notification> findUnreadNotifications();
 
     /**
@@ -78,7 +86,10 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     /**
      * Lấy notifications gần đây (để hiển thị trong dropdown)
      */
-    @Query("SELECT n FROM Notification n ORDER BY n.createdAt DESC")
+        @Query("SELECT n FROM Notification n " +
+            "LEFT JOIN FETCH n.session " +
+            "LEFT JOIN FETCH n.table " +
+            "ORDER BY n.createdAt DESC")
     List<Notification> findRecentNotifications(Pageable pageable);
 
     /**

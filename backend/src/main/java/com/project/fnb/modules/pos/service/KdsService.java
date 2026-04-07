@@ -79,10 +79,8 @@ public class KdsService {
      */
     @Transactional(readOnly = true)
     public List<KdsOrderItemDto> getPendingItemsForSession(Long sessionId) {
-        List<ServingSession> sessions = sessionRepository.findAllActive();
-        
-        return sessions.stream()
-                .filter(s -> s.getId().equals(sessionId))
+        return sessionRepository.findActiveByIdWithDetails(sessionId)
+                .stream()
                 .flatMap(s -> s.getOrders().stream()
                         .flatMap(o -> o.getItems().stream()
                                 .filter(i -> i.getStatus() == OrderItem.ItemStatus.PENDING)

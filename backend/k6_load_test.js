@@ -10,6 +10,13 @@ const PROFILE = (__ENV.TEST_PROFILE || 'stress').toLowerCase();
 const IS_SMOKE = PROFILE === 'smoke';
 const STRESS_SCALE = Math.max(0.05, Number(__ENV.STRESS_SCALE || '1'));
 const STRICT_MODE = (__ENV.STRICT_MODE || (IS_SMOKE ? 'true' : 'false')).toLowerCase() === 'true';
+const GROUP_SIZE_TARGET = Math.max(3, Math.min(5, Number(__ENV.GROUP_SIZE_TARGET || '4')));
+const CONCURRENT_TABLE_VUS = IS_SMOKE
+  ? GROUP_SIZE_TARGET
+  : Math.max(GROUP_SIZE_TARGET, scaleTarget(25));
+const CONCURRENT_TABLE_ITERATIONS = IS_SMOKE
+  ? 3
+  : Math.max(3, scaleTarget(12));
 
 const businessErrorRate = new Rate('business_error_rate');
 const sessionOpenCount = new Counter('session_open_count');
@@ -50,26 +57,34 @@ export const options = {
   },
   scenarios: IS_SMOKE
     ? {
-        full_pos_flow: {
+        concurrent_table_ops: {
           executor: 'per-vu-iterations',
-          exec: 'fullPosFlow',
-          vus: 1,
+          exec: 'concurrentTableOperations',
+          vus: CONCURRENT_TABLE_VUS,
           iterations: 3,
           maxDuration: '60s',
           startTime: '0s',
         },
       }
     : {
-        full_pos_flow: {
+        group_order: {
           executor: 'ramping-vus',
-          exec: 'fullPosFlow',
+          exec: 'groupOrderFlow',
           startVUs: 0,
           stages: [
-            { duration: '30s', target: scaleTarget(30) },
-            { duration: '60s', target: scaleTarget(60) },
-            { duration: '60s', target: scaleTarget(120) },
-            { duration: '30s', target: 0 },
+            { duration: '30s', target: scaleTarget(20) },
+            { duration: '60s', target: scaleTarget(40) },
+            { duration: '90s', target: scaleTarget(60) },
+            { duration: '60s', target: 0 },
           ],
+        },
+        concurrent_table_ops: {
+          executor: 'per-vu-iterations',
+          exec: 'concurrentTableOperations',
+          vus: CONCURRENT_TABLE_VUS,
+          iterations: CONCURRENT_TABLE_ITERATIONS,
+          maxDuration: '240s',
+          startTime: '30s',
         },
       },
 };
@@ -287,6 +302,28 @@ export function setup() {
   }
   if (!productIds.length) fail('cannot create any product');
 
+  const stressMaxVus = scaleTarget(60);
+  const desiredSessionGroups = IS_SMOKE ? 1 : Math.max(1, Math.floor(stressMaxVus / GROUP_SIZE_TARGET));
+  const groupSessionCount = Math.min(desiredSessionGroups, tableIds.length);
+
+  const sharedSessionIds = [];
+  const sharedTableIds = [];
+  for (let i = 0; i < groupSessionCount; i += 1) {
+    const groupTableId = String(tableIds[i]);
+    const groupSession = request(
+      'POST',
+      '/api/pos/sessions',
+      JSON.stringify({ tableId: groupTableId, note: `k6 shared group session #${i + 1}` }),
+      jsonHeaders({ token, tenantId }),
+      true
+    );
+    if (groupSession.ok && groupSession.data && groupSession.data.sessionId) {
+      sharedSessionIds.push(String(groupSession.data.sessionId));
+      sharedTableIds.push(groupTableId);
+    }
+  }
+  if (!sharedSessionIds.length) fail('cannot create shared group sessions');
+
   return {
     token,
     tenantId,
@@ -295,6 +332,8 @@ export function setup() {
     opsTableIds: effectiveOpsTableIds,
     productIds,
     paymentMethod: seed.paymentMethod || 'CASH',
+    sharedSessionIds,
+    sharedTableIds,
   };
 }
 
@@ -509,6 +548,119 @@ export function transactionFlow(data) {
     assertStep(pay, 'pay session success', `POST /api/pos/sessions/${sessionId}/pay`);
   });
 }
+
+export function groupOrderFlow(data) {
+  const ctx = { token: data.token, tenantId: data.tenantId };
+  const sharedSessionIds = Array.isArray(data.sharedSessionIds) && data.sharedSessionIds.length
+    ? data.sharedSessionIds
+    : [data.sharedSessionId];
+  const sessionId = String(sharedSessionIds[(Math.max(1, exec.vu.idInTest) - 1) % sharedSessionIds.length]);
+  const productId = Number(vuPick(data.productIds, exec.vu.idInTest));
+  const quantity = 1 + (exec.vu.idInTest % 2);
+
+  group('group order flow', function () {
+    // Simulate customer decision time to avoid unrealistically synchronized writes.
+    sleep(0.2 + Math.random() * 0.8);
+
+    const addRes = request(
+      'POST',
+      `/api/pos/sessions/${sessionId}/items`,
+      JSON.stringify({ items: [{ productId, quantity }] }),
+      jsonHeaders(ctx),
+      true
+    );
+    assertStep(addRes, 'group add items success', `POST /api/pos/sessions/${sessionId}/items`);
+
+    const detail = getSessionDetail(ctx, sessionId);
+    assertStep(detail, 'group session detail success', `GET /api/pos/sessions/${sessionId}`);
+  });
+}
+
+export function concurrentTableOperations(data) {
+  const ctx = { token: data.token, tenantId: data.tenantId };
+  const sharedSessionIds = Array.isArray(data.sharedSessionIds) && data.sharedSessionIds.length
+    ? data.sharedSessionIds
+    : [data.sharedSessionId];
+
+  // Group VUs by table-size so 4-5 users hit the same session concurrently.
+  const vuIndex = Math.max(0, exec.vu.idInTest - 1);
+  const groupIndex = Math.floor(vuIndex / GROUP_SIZE_TARGET);
+  const concurrentSessionId = String(sharedSessionIds[groupIndex % sharedSessionIds.length]);
+  const vuId = exec.vu.idInTest;
+
+  group('concurrent table operations', function () {
+    // Random stagger to simulate realistic timing (4-5 customers arriving at table)
+    sleep(Math.random() * 0.3);
+
+    // Get current session detail to find existing items
+    const sessionDetail = getSessionDetail(ctx, concurrentSessionId);
+    if (!sessionDetail.ok) {
+      businessErrorRate.add(1, { path: 'concurrent_ops', reason: 'get_session_failed' });
+      return;
+    }
+
+    // Find a pending item ID if any exist
+    const existingItemId = findPendingItemId(sessionDetail.data);
+    const operationRoll = Math.random();
+
+    // Operation 1: One customer adds items (majority of customers perform this)
+    if (!existingItemId || operationRoll < 0.6) {
+      const productId = Number(vuPick(data.productIds, vuId));
+      const addQty = 1 + (vuId % 3);
+
+      const addRes = request(
+        'POST',
+        `/api/pos/sessions/${concurrentSessionId}/items`,
+        JSON.stringify({ items: [{ productId, quantity: addQty }] }),
+        jsonHeaders(ctx),
+        true
+      );
+      assertStep(addRes, 'concurrent add items success', `POST /api/pos/sessions/${concurrentSessionId}/items`);
+
+      // After adding, immediately get detail to see what was added
+      sleep(0.05 + Math.random() * 0.1);
+      const detailAfterAdd = getSessionDetail(ctx, concurrentSessionId);
+      assertStep(detailAfterAdd, 'get session detail after add', `GET /api/pos/sessions/${concurrentSessionId}`);
+    }
+    // Operation 2: Another customer updates quantity of existing item
+    else if (existingItemId && operationRoll < 0.85) {
+      const newQty = 2 + (vuId % 5);
+
+      const updateRes = request(
+        'PATCH',
+        `/api/pos/sessions/${concurrentSessionId}/items/${existingItemId}`,
+        JSON.stringify({ quantity: newQty }),
+        jsonHeaders(ctx),
+        true
+      );
+      assertStep(updateRes, 'concurrent update quantity success', `PATCH /api/pos/sessions/${concurrentSessionId}/items/${existingItemId}`);
+
+      sleep(0.05 + Math.random() * 0.1);
+      const detailAfterUpdate = getSessionDetail(ctx, concurrentSessionId);
+      assertStep(detailAfterUpdate, 'get session detail after update', `GET /api/pos/sessions/${concurrentSessionId}`);
+    }
+    // Operation 3: Another customer deletes item (less frequent)
+    else if (existingItemId) {
+      const deleteRes = request(
+        'DELETE',
+        `/api/pos/sessions/${concurrentSessionId}/items/${existingItemId}`,
+        null,
+        authHeaders(ctx),
+        true
+      );
+      assertStep(deleteRes, 'concurrent delete item success', `DELETE /api/pos/sessions/${concurrentSessionId}/items/${existingItemId}`);
+
+      sleep(0.05 + Math.random() * 0.1);
+      const detailAfterDelete = getSessionDetail(ctx, concurrentSessionId);
+      assertStep(detailAfterDelete, 'get session detail after delete', `GET /api/pos/sessions/${concurrentSessionId}`);
+    }
+
+    // Final check: verify session state after all concurrent operations
+    const finalDetail = getSessionDetail(ctx, concurrentSessionId);
+    assertStep(finalDetail, 'final session state check', `GET /api/pos/sessions/${concurrentSessionId}`);
+  });
+}
+
 
 export function fullPosFlow(data) {
   const ctx = { token: data.token, tenantId: data.tenantId };

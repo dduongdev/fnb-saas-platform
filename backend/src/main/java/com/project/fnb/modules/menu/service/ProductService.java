@@ -81,11 +81,11 @@ public class ProductService {
         Page<Product> products;
         
         if (categoryId != null && status != null) {
-            products = productRepository.findByCategoryIdAndStatus(categoryId, status, pageable);
+            products = productRepository.findByCategoryIdAndStatusWithImages(categoryId, status, pageable);
         } else if (categoryId != null) {
-            products = productRepository.findByCategoryId(categoryId, pageable);
+            products = productRepository.findByCategoryIdWithImages(categoryId, pageable);
         } else if (status != null) {
-            products = productRepository.findByStatus(status, pageable);
+            products = productRepository.findByStatusWithImages(status, pageable);
         } else {
             // Fix N+1 query: Use findAllWithImages() to eager load all images
             // Before: 1 query + N queries (for each product's images)
@@ -314,7 +314,7 @@ public class ProductService {
      * @see #mapToResponse(Product)
      */
     public ProductResponse getProductDetail(Long id) {
-        Product product = productRepository.findById(id)
+        Product product = productRepository.findByIdWithImages(id)
                 .orElseThrow(() -> new AppException(404, "Sản phẩm không tồn tại"));
         return mapToResponse(product);
     }

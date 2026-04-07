@@ -135,11 +135,12 @@ public class OrderService {
             tenantId = order.getTenantId();
         }
         try {
-            DiningTable table = order.getPrimaryTable();
+            Order orderWithDetails = orderRepository.findByIdWithItemsAndProducts(order.getId()).orElse(order);
+            DiningTable table = orderWithDetails.getPrimaryTable();
             if (table == null) return;
             
             String topic = "/topic/tenant/" + tenantId + "/table/" + table.getId();
-            OrderResponse payload = OrderResponse.fromEntity(order);
+            OrderResponse payload = OrderResponse.fromEntity(orderWithDetails);
             messagingTemplate.convertAndSend(topic, payload);
         } catch (Exception e) {
             log.error("Socket update error", e);

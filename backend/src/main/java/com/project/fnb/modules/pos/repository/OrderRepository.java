@@ -5,8 +5,10 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 
 import com.project.fnb.modules.pos.entity.Order;
 import com.project.fnb.modules.reporting.dto.HourlyStatDto;
@@ -34,6 +36,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Override
     @Query("SELECT o FROM Order o WHERE o.id = :id")
     Optional<Order> findById(@Param("id") Long id);
+
+       /**
+        * Khóa pessimistic write để serialize các transaction cùng cập nhật một order.
+        */
+       @Lock(LockModeType.PESSIMISTIC_WRITE)
+       @Query("SELECT o FROM Order o WHERE o.id = :id")
+       Optional<Order> findByIdForUpdate(@Param("id") Long id);
 
     /**
      * Thống kê số lượng order theo giờ trong khoảng thời gian (peak hours analysis).
@@ -78,7 +87,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      */
     @Query("SELECT o FROM Order o " +
            "LEFT JOIN FETCH o.items oi " +
-           "LEFT JOIN FETCH oi.product " +
+           "LEFT JOIN FETCH oi.product p " +
+           "LEFT JOIN FETCH p.images " +
            "WHERE o.id = :id")
     Optional<Order> findByIdWithItemsAndProducts(@Param("id") Long id);
 
@@ -93,7 +103,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      */
     @Query("SELECT o FROM Order o " +
            "LEFT JOIN FETCH o.items oi " +
-           "LEFT JOIN FETCH oi.product " +
+           "LEFT JOIN FETCH oi.product p " +
+           "LEFT JOIN FETCH p.images " +
            "WHERE o.session.id = :sessionId")
     List<Order> findBySessionIdWithItemsAndProducts(@Param("sessionId") Long sessionId);
 }

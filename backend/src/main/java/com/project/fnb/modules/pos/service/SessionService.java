@@ -20,8 +20,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Service quản lý phiên phục vụ (Serving Session) trong hệ thống POS.
@@ -211,22 +219,29 @@ public class SessionService {
         if (order == null) {
             throw new AppException(400, "Session không có order");
         }
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            order = orderRepository.findByIdForUpdate(order.getId())
+                    .orElseThrow(() -> new AppException(404, "Order không tồn tại"));
+        }
 
         DiningTable sourceTable = null;
         if (request.getSourceTableId() != null) {
             sourceTable = tableRepository.findById(request.getSourceTableId()).orElse(null);
         }
 
-        List<String> addedItems = new java.util.ArrayList<>();
+        List<OrderItem> orderItems = new ArrayList<>();
+        List<String> addedItems = new ArrayList<>();
+        BigDecimal totalDelta = BigDecimal.ZERO;
+        Map<Long, Product> productsById = loadProductsByIds(request.getItems());
+
         for (AddItemRequest item : request.getItems()) {
-            Product product = productRepository.findById(item.getProductId())
-                    .orElseThrow(() -> new AppException(404, "Món không tồn tại: " + item.getProductId()));
+            Product product = productsById.get(item.getProductId());
 
             if (product.getStatus() == Product.ProductStatus.OUT_OF_STOCK) {
                 throw new AppException(400, "Món đã hết: " + product.getName());
             }
 
-            OrderItem orderItem = OrderItem.builder()
+            orderItems.add(OrderItem.builder()
                     .order(order)
                     .product(product)
                     .originalTable(sourceTable)
@@ -234,29 +249,46 @@ public class SessionService {
                     .price(product.getPrice())
                     .note(item.getNote())
                     .status(OrderItem.ItemStatus.PENDING)
-                    .build();
-            orderItem = orderItemRepository.save(orderItem);
-
-            // Add vào collection để SessionResponse.fromEntity có thể thấy item mới
-            order.getItems().add(orderItem);
+                    .build());
 
             BigDecimal itemTotal = product.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
-            order.setTotalAmount(order.getTotalAmount().add(itemTotal));
-            orderRepository.save(order);
-
+            totalDelta = totalDelta.add(itemTotal);
             addedItems.add(item.getQuantity() + "x " + product.getName());
-
-            // Notify từng item đã thêm
-            notifyItemEvent("ORDER_ITEM_ADDED", session, orderItem);
-            kdsEventPublisher.publishItemAdded(orderItem, session.getId(), null);
         }
 
-        // Notify
-        sendNotification("NEW_ITEM", session.getPrimaryTable(),
-                "Bàn " + session.getTableNames() + " vừa gọi thêm món");
+        List<OrderItem> savedItems = orderItemRepository.saveAll(orderItems);
+        if (savedItems == null || savedItems.size() != orderItems.size()) {
+            throw new AppException(500, "Không thể lưu đầy đủ món đã gọi");
+        }
+        order.getItems().addAll(savedItems);
+        order.setTotalAmount(order.getTotalAmount().add(totalDelta));
+        orderRepository.save(order);
+
+        List<OrderItem> postCommitItems = new ArrayList<>(savedItems);
+        String sessionNotification = "Bàn " + session.getTableNames() + " vừa gọi thêm món";
+        String auditDetail = "Thêm " + request.getItems().size() + " món: " + String.join(", ", addedItems);
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    for (OrderItem savedItem : postCommitItems) {
+                        notifyItemEvent("ORDER_ITEM_ADDED", session, savedItem);
+                        kdsEventPublisher.publishItemAdded(savedItem, session.getId(), null);
+                    }
+                    sendNotification("NEW_ITEM", session.getPrimaryTable(), sessionNotification);
+                }
+            });
+        } else {
+            for (OrderItem savedItem : postCommitItems) {
+                notifyItemEvent("ORDER_ITEM_ADDED", session, savedItem);
+                kdsEventPublisher.publishItemAdded(savedItem, session.getId(), null);
+            }
+            sendNotification("NEW_ITEM", session.getPrimaryTable(), sessionNotification);
+        }
 
         recordAction("session.add_item", "SESSION", String.valueOf(session.getId()), order.getTotalAmount(),
-                "Thêm " + request.getItems().size() + " món: " + String.join(", ", addedItems), session.getId());
+                auditDetail, session.getId());
     }
 
     /**
@@ -836,8 +868,24 @@ public class SessionService {
 
     public org.springframework.data.domain.Page<SessionResponse> getSessionHistory(int page, int size) {
         org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size, org.springframework.data.domain.Sort.by("startedAt").descending());
-        return sessionRepository.findSessionHistory(pageable)
-                .map(SessionResponse::fromEntity);
+        org.springframework.data.domain.Page<Long> idPage = sessionRepository.findSessionHistoryIds(pageable);
+        if (idPage.isEmpty()) {
+            return new org.springframework.data.domain.PageImpl<>(List.of(), pageable, idPage.getTotalElements());
+        }
+
+        List<ServingSession> sessions = sessionRepository.findSessionHistoryByIdsWithDetails(idPage.getContent());
+        Map<Long, ServingSession> sessionById = new HashMap<>();
+        for (ServingSession session : sessions) {
+            sessionById.put(session.getId(), session);
+        }
+
+        List<SessionResponse> content = idPage.getContent().stream()
+                .map(sessionById::get)
+                .filter(java.util.Objects::nonNull)
+                .map(SessionResponse::fromEntity)
+                .toList();
+
+        return new org.springframework.data.domain.PageImpl<>(content, pageable, idPage.getTotalElements());
     }
 
     /**
@@ -872,8 +920,8 @@ public class SessionService {
         // Chuyển table sang OCCUPIED
         for (DiningTable table : session.getTables()) {
             table.setStatus(DiningTable.Status.OCCUPIED);
-            tableRepository.save(table);
         }
+        tableRepository.saveAll(session.getTables());
 
         // Notify
         notifyTableUpdate();
@@ -966,9 +1014,12 @@ public class SessionService {
      * @throws AppException 400 nếu món hết hàng
      */
     private void addItemsToOrder(Order order, List<AddItemRequest> items, DiningTable sourceTable) {
+        Map<Long, Product> productsById = loadProductsByIds(items);
+        List<OrderItem> orderItems = new ArrayList<>();
+        BigDecimal totalDelta = BigDecimal.ZERO;
+
         for (AddItemRequest item : items) {
-            Product product = productRepository.findById(item.getProductId())
-                    .orElseThrow(() -> new AppException(404, "Món không tồn tại: " + item.getProductId()));
+            Product product = productsById.get(item.getProductId());
 
             if (product.getStatus() == Product.ProductStatus.OUT_OF_STOCK) {
                 throw new AppException(400, "Món đã hết: " + product.getName());
@@ -983,15 +1034,34 @@ public class SessionService {
                     .note(item.getNote())
                     .status(OrderItem.ItemStatus.PENDING)
                     .build();
-            orderItem = orderItemRepository.save(orderItem);
-            
-            // CRITICAL: Add item to order's items collection for in-memory access
-            order.getItems().add(orderItem);
+            orderItems.add(orderItem);
 
             BigDecimal itemTotal = product.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
-            order.setTotalAmount(order.getTotalAmount().add(itemTotal));
+            totalDelta = totalDelta.add(itemTotal);
         }
+
+        List<OrderItem> savedItems = orderItemRepository.saveAll(orderItems);
+        order.getItems().addAll(savedItems);
+        order.setTotalAmount(order.getTotalAmount().add(totalDelta));
         orderRepository.save(order);
+    }
+
+    private Map<Long, Product> loadProductsByIds(List<AddItemRequest> items) {
+        Set<Long> productIds = items.stream()
+                .map(AddItemRequest::getProductId)
+                .collect(Collectors.toSet());
+
+        Map<Long, Product> productsById = productRepository.findAllById(productIds).stream()
+                .collect(Collectors.toMap(Product::getId, p -> p));
+
+        Set<Long> missingProductIds = productIds.stream()
+                .filter(id -> !productsById.containsKey(id))
+                .collect(Collectors.toSet());
+        if (!missingProductIds.isEmpty()) {
+            Long missingId = missingProductIds.stream().min(Comparator.naturalOrder()).orElse(null);
+            throw new AppException(404, "Món không tồn tại: " + missingId);
+        }
+        return productsById;
     }
 
     /**

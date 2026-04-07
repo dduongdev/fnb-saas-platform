@@ -99,7 +99,7 @@ class ProductServiceTest {
 
     @Test
     void getProductDetail_WhenExists_ShouldReturnResponse() {
-        when(productRepository.findById(1L)).thenReturn(Optional.of(testProduct));
+        when(productRepository.findByIdWithImages(1L)).thenReturn(Optional.of(testProduct));
 
         ProductResponse result = productService.getProductDetail(1L);
 
@@ -109,7 +109,7 @@ class ProductServiceTest {
 
     @Test
     void getProductDetail_WhenNotExists_ShouldThrowException() {
-        when(productRepository.findById(1L)).thenReturn(Optional.empty());
+        when(productRepository.findByIdWithImages(1L)).thenReturn(Optional.empty());
 
         AppException ex = assertThrows(AppException.class, () -> productService.getProductDetail(1L));
         assertEquals(404, ex.getErrorCode());
@@ -194,34 +194,34 @@ void removeImage_ShouldDeleteImage() {
     @Test
     void getProducts_WithCategoryIdAndStatus_ShouldCallCorrectRepositoryMethod() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(productRepository.findByCategoryIdAndStatus(1, Product.ProductStatus.AVAILABLE, pageable))
+        when(productRepository.findByCategoryIdAndStatusWithImages(1, Product.ProductStatus.AVAILABLE, pageable))
                 .thenReturn(new PageImpl<>(Collections.singletonList(testProduct)));
 
         productService.getProducts(1, Product.ProductStatus.AVAILABLE, pageable);
 
-        verify(productRepository).findByCategoryIdAndStatus(1, Product.ProductStatus.AVAILABLE, pageable);
+        verify(productRepository).findByCategoryIdAndStatusWithImages(1, Product.ProductStatus.AVAILABLE, pageable);
     }
 
     @Test
     void getProducts_WithCategoryIdOnly_ShouldCallCorrectRepositoryMethod() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(productRepository.findByCategoryId(1, pageable))
+        when(productRepository.findByCategoryIdWithImages(1, pageable))
                 .thenReturn(new PageImpl<>(Collections.singletonList(testProduct)));
 
         productService.getProducts(1, null, pageable);
 
-        verify(productRepository).findByCategoryId(1, pageable);
+        verify(productRepository).findByCategoryIdWithImages(1, pageable);
     }
 
     @Test
     void getProducts_WithStatusOnly_ShouldCallCorrectRepositoryMethod() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(productRepository.findByStatus(Product.ProductStatus.AVAILABLE, pageable))
+        when(productRepository.findByStatusWithImages(Product.ProductStatus.AVAILABLE, pageable))
                 .thenReturn(new PageImpl<>(Collections.singletonList(testProduct)));
 
         productService.getProducts(null, Product.ProductStatus.AVAILABLE, pageable);
 
-        verify(productRepository).findByStatus(Product.ProductStatus.AVAILABLE, pageable);
+        verify(productRepository).findByStatusWithImages(Product.ProductStatus.AVAILABLE, pageable);
     }
 
     @Test

@@ -120,7 +120,7 @@ class KdsServiceTest {
         order.getItems().add(served);
         session.getOrders().add(order);
 
-        when(sessionRepository.findAllActive()).thenReturn(List.of(session));
+        when(sessionRepository.findActiveByIdWithDetails(10L)).thenReturn(java.util.Optional.of(session));
 
         List<KdsOrderItemDto> pendingItems = kdsService.getPendingItemsForSession(10L);
 

@@ -22,14 +22,25 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("SELECT p FROM Product p WHERE p.id = :id")
     Optional<Product> findById(@NonNull @Param("id") Long id);
 
-    // Find by category
-    Page<Product> findByCategoryId(Integer categoryId, Pageable pageable);
-    
-    // Find by status
-    Page<Product> findByStatus(Product.ProductStatus status, Pageable pageable);
-    
-    // Find by category and status
-    Page<Product> findByCategoryIdAndStatus(Integer categoryId, Product.ProductStatus status, Pageable pageable);
+        @Query(value = "SELECT DISTINCT p FROM Product p " +
+            "LEFT JOIN FETCH p.images " +
+            "WHERE p.category.id = :categoryId AND p.isDeleted = false",
+            countQuery = "SELECT COUNT(p) FROM Product p WHERE p.category.id = :categoryId AND p.isDeleted = false")
+        Page<Product> findByCategoryIdWithImages(@Param("categoryId") Integer categoryId, Pageable pageable);
+
+        @Query(value = "SELECT DISTINCT p FROM Product p " +
+            "LEFT JOIN FETCH p.images " +
+            "WHERE p.status = :status AND p.isDeleted = false",
+            countQuery = "SELECT COUNT(p) FROM Product p WHERE p.status = :status AND p.isDeleted = false")
+        Page<Product> findByStatusWithImages(@Param("status") Product.ProductStatus status, Pageable pageable);
+
+        @Query(value = "SELECT DISTINCT p FROM Product p " +
+            "LEFT JOIN FETCH p.images " +
+            "WHERE p.category.id = :categoryId AND p.status = :status AND p.isDeleted = false",
+            countQuery = "SELECT COUNT(p) FROM Product p WHERE p.category.id = :categoryId AND p.status = :status AND p.isDeleted = false")
+        Page<Product> findByCategoryIdAndStatusWithImages(@Param("categoryId") Integer categoryId,
+                                     @Param("status") Product.ProductStatus status,
+                                     Pageable pageable);
 
     /**
      * Lấy tất cả products với images (eager load) - có pagination.
@@ -40,8 +51,12 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
      * @param pageable Pagination
      * @return Page&lt;Product&gt; với tất cả images đã load
      */
-    @Query("SELECT p FROM Product p " +
+        @Query(value = "SELECT DISTINCT p FROM Product p " +
            "LEFT JOIN FETCH p.images " +
-           "WHERE p.isDeleted = false")
+            "WHERE p.isDeleted = false",
+            countQuery = "SELECT COUNT(p) FROM Product p WHERE p.isDeleted = false")
     Page<Product> findAllWithImages(Pageable pageable);
+
+        @Query("SELECT p FROM Product p LEFT JOIN FETCH p.images WHERE p.id = :id")
+        Optional<Product> findByIdWithImages(@Param("id") Long id);
 }

@@ -368,7 +368,7 @@ class SessionServiceTest {
         product.setName("Coke");
         product.setPrice(BigDecimal.valueOf(10));
         product.setStatus(Product.ProductStatus.AVAILABLE);
-        when(productRepository.findById(2L)).thenReturn(Optional.of(product));
+        when(productRepository.findAllById(any())).thenReturn(java.util.List.of(product));
 
         com.project.fnb.modules.pos.dto.AddItemRequest itemReq = new com.project.fnb.modules.pos.dto.AddItemRequest();
         itemReq.setProductId(2L);
@@ -379,7 +379,7 @@ class SessionServiceTest {
         request.setItems(java.util.List.of(itemReq));
 
         when(tableRepository.findById("t1")).thenReturn(Optional.of(table));
-        when(orderItemRepository.save(any(OrderItem.class))).thenAnswer(i -> i.getArgument(0));
+        when(orderItemRepository.saveAll(any())).thenAnswer(i -> i.getArgument(0));
 
         sessionService.addItems(1L, request);
 
@@ -422,8 +422,8 @@ class SessionServiceTest {
         product.setId(1L);
         product.setPrice(BigDecimal.valueOf(100));
         product.setStatus(Product.ProductStatus.AVAILABLE);
-        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
-        when(orderItemRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(productRepository.findAllById(any())).thenReturn(java.util.List.of(product));
+        when(orderItemRepository.saveAll(any())).thenAnswer(i -> i.getArgument(0));
 
         com.project.fnb.modules.pos.dto.CustomerOrderResponse res = sessionService.createCustomerOrder(req);
 
@@ -450,7 +450,7 @@ class SessionServiceTest {
         assertEquals(ServingSession.SessionStatus.ACTIVE, result.getStatus());
         assertEquals(DiningTable.Status.OCCUPIED, table.getStatus());
         verify(kdsEventPublisher).publishSessionCreated(session, null);
-        verify(tableRepository, org.mockito.Mockito.atLeastOnce()).save(any());
+        verify(tableRepository, org.mockito.Mockito.atLeastOnce()).saveAll(any());
         verify(sessionRepository).save(session);
     }
 
@@ -498,8 +498,8 @@ class SessionServiceTest {
         product.setId(1L);
         product.setPrice(BigDecimal.valueOf(50));
         product.setStatus(Product.ProductStatus.AVAILABLE);
-        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
-        when(orderItemRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(productRepository.findAllById(any())).thenReturn(java.util.List.of(product));
+        when(orderItemRepository.saveAll(any())).thenAnswer(i -> i.getArgument(0));
 
         com.project.fnb.modules.pos.dto.CustomerOrderRequest req = new com.project.fnb.modules.pos.dto.CustomerOrderRequest();
         req.setTableId("t1");
