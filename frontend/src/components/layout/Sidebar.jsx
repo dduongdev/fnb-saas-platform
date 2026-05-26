@@ -86,8 +86,10 @@ export function Sidebar() {
                         <div key={section.section} className="sidebar-section">
                             <span className="sidebar-section-title">{section.section}</span>
                             <ul className="sidebar-menu">
-                                {section.items.map((item) => (
-                                    <li key={item.path}>
+                                {section.items
+                                    .filter((item) => !(item.path === '/kds' && user?.accessKeyRole === 'WAITER'))
+                                    .map((item) => (
+                                        <li key={item.path}>
                                         <NavLink
                                             to={item.path}
                                             end

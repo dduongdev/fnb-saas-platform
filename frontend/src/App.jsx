@@ -52,15 +52,15 @@ function ProtectedRoute({ children }) {
 // Tenant Required Route wrapper
 function TenantRoute({ children }) {
   const { tenant, loading } = useTenant();
-  const { isKitchen } = useAuth();
+  const { isWaitstaff } = useAuth();
 
   if (loading) {
     return <Loading fullPage text="Đang tải..." />;
   }
 
   if (!tenant) {
-    if (isKitchen) {
-      return <Loading fullPage text="Đang tải dữ liệu bếp..." />;
+    if (isWaitstaff) {
+      return <Navigate to="/access-key-login" replace />;
     }
     return <Navigate to="/dashboard" replace />;
   }
@@ -76,6 +76,26 @@ function OwnerRoute({ children }) {
     return <Navigate to="/pos" replace />;
   }
 
+  return children;
+}
+
+function OwnerDashboardRoute({ children }) {
+  const { isWaitstaff } = useAuth();
+  
+  if (isWaitstaff) {
+    return <Navigate to="/pos" replace />;
+  }
+  
+  return children;
+}
+
+function KdsRoute({ children }) {
+  const { isWaitstaff, isKitchen } = useAuth();
+  
+  if (isWaitstaff && !isKitchen) {
+    return <Navigate to="/pos" replace />;
+  }
+  
   return children;
 }
 
@@ -98,7 +118,9 @@ function AppRoutes() {
         path="/dashboard"
         element={
           <ProtectedRoute>
-            <DashboardPage />
+            <OwnerDashboardRoute>
+              <DashboardPage />
+            </OwnerDashboardRoute>
           </ProtectedRoute>
         }
       />
@@ -132,9 +154,11 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <TenantRoute>
-              <KdsProvider tenantId={tenant?.id}>
-                <KdsPage />
-              </KdsProvider>
+              <KdsRoute>
+                <KdsProvider tenantId={tenant?.id}>
+                  <KdsPage />
+                </KdsProvider>
+              </KdsRoute>
             </TenantRoute>
           </ProtectedRoute>
         }
@@ -186,7 +210,9 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <TenantRoute>
-              <ProductListPage />
+              <OwnerRoute>
+                <ProductListPage />
+              </OwnerRoute>
             </TenantRoute>
           </ProtectedRoute>
         }
@@ -196,7 +222,9 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <TenantRoute>
-              <CategoryListPage />
+              <OwnerRoute>
+                <CategoryListPage />
+              </OwnerRoute>
             </TenantRoute>
           </ProtectedRoute>
         }

@@ -33,7 +33,7 @@ export const AccessKeyLoginPage = () => {
                 if (info.role === 'KITCHEN') {
                     window.location.href = '/kds';
                 } else {
-                    window.location.href = '/dashboard';
+                    window.location.href = '/pos';
                 }
             } else {
                 localStorage.removeItem('pos_access_key');

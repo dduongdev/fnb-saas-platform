@@ -37,6 +37,18 @@ export function TenantProvider({ children }) {
             setLoading(true);
             const data = await getMyTenants();
             setTenants(data || []);
+            
+            const savedTenantId = localStorage.getItem('tenant_id');
+            if (savedTenantId && data?.length > 0) {
+                const savedTenant = data.find(t => t.id === savedTenantId);
+                if (savedTenant) {
+                    setTenant(savedTenant);
+                }
+            } else if (data?.length === 1 && localStorage.getItem('pos_access_key')) {
+                // If POS and only has 1 tenant, auto select it
+                setTenant(data[0]);
+                localStorage.setItem('tenant_id', data[0].id);
+            }
         } catch (error) {
             console.error('Failed to load tenants:', error);
             setTenants([]);
