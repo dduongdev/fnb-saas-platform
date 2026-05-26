@@ -12,6 +12,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/profile")
 @RequiredArgsConstructor
+@com.project.fnb.aspect.RequirePermission(com.project.fnb.aspect.OwnerPermissionValidator.class)
 public class ProfileController {
 
     private final UserService userService;

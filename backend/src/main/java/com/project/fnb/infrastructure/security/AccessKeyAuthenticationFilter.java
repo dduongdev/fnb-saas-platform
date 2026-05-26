@@ -37,6 +37,11 @@ public class AccessKeyAuthenticationFilter extends OncePerRequestFilter {
                 log.error("Lỗi xác thực Access Key", e);
                 // Clear context for secure reasons
                 SecurityContextHolder.clearContext();
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.setCharacterEncoding("UTF-8");
+                response.getWriter().write("{\"code\": 401, \"message\": \"Access Key không hợp lệ hoặc đã bị vô hiệu hoá\"}");
+                return;
             }
         }
 

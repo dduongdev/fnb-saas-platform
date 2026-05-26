@@ -183,7 +183,7 @@ function kdsReducer(state, action) {
 /**
  * KdsProvider component
  */
-export function KdsProvider({ children, tenantId, kitchenAreaId }) {
+export function KdsProvider({ children, tenantId }) {
   const [state, dispatch] = useReducer(kdsReducer, initialState);
 
   // Handle incoming WebSocket messages
@@ -287,7 +287,7 @@ export function KdsProvider({ children, tenantId, kitchenAreaId }) {
 
         // STEP 3: Connect to WebSocket for real-time updates
         console.log('Connecting to KDS WebSocket for real-time updates...');
-        await KdsWebSocketService.connect(tenantId, kitchenAreaId);
+        await KdsWebSocketService.connect(tenantId);
 
         if (canceled) {
           KdsWebSocketService.disconnect();
@@ -318,7 +318,7 @@ export function KdsProvider({ children, tenantId, kitchenAreaId }) {
       KdsWebSocketService.disconnect();
       dispatch({ type: KDS_ACTIONS.SET_DISCONNECTED });
     };
-  }, [tenantId, kitchenAreaId, handleMessage]);
+  }, [tenantId, handleMessage]);
 
   const value = {
     sessions: state.sessions,

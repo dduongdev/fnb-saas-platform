@@ -21,13 +21,13 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
  * <p><b>Message Flow:</b></p>
  * <pre>
  * Client Subscribe:
- *   SUBSCRIBE /topic/kds/{tenantId}/{kitchenAreaId}
+ *   SUBSCRIBE /topic/kds/{tenantId}
  *   ↓ (Spring routes to KdsWebSocketController)
  *   handleSubscribe() receives subscription
  *   ↓
  *   publishes initial data
  *   ↓ (Server broadcasts via messagingTemplate.convertAndSend)
- *   SEND /topic/kds/{tenantId}/{kitchenAreaId}
+ *   SEND /topic/kds/{tenantId}
  *   ↓
  *   Client receives message
  * </pre>
@@ -35,7 +35,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
  * <p><b>Cross-Origin (CORS):</b> Configured để client từ domain khác có thể kết nối.</p>
  * 
  * @author FNB Team
- * @version 1.0
+ * @version 2.0
  */
 @Configuration
 @EnableWebSocketMessageBroker
@@ -65,8 +65,7 @@ public class KdsWebSocketConfig implements WebSocketMessageBrokerConfigurer {
      * 
      * <p><b>Example Topics:</b></p>
      * <ul>
-     *   <li>/topic/kds/{tenantId}/{kitchenAreaId} - Updates for specific kitchen area</li>
-     *   <li>/topic/kds/{tenantId} - Updates for entire tenant (if needed)</li>
+     *   <li>/topic/kds/{tenantId} - Updates for the tenant's kitchen</li>
      * </ul>
      * 
      * @param config MessageBrokerRegistry

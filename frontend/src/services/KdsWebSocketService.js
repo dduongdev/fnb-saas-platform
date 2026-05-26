@@ -8,7 +8,7 @@
  * - Auto-reconnect logic (optional)
  * 
  * @author FNB Team
- * @version 1.0
+ * @version 2.0
  */
 
 import { Client } from '@stomp/stompjs';
@@ -31,7 +31,6 @@ class KdsWebSocketService {
     this.messageHandlers = [];
     this.connectionPromise = null;
     this.tenantId = null;
-    this.kitchenAreaId = null;
     this.connectInProgress = false;  // Prevent duplicate connection attempts
   }
 
@@ -39,10 +38,9 @@ class KdsWebSocketService {
    * Connect tới WebSocket server.
    * 
    * @param {number} tenantId - Tenant ID
-   * @param {string} kitchenAreaId - Kitchen Area ID (optional)
    * @returns {Promise} - Resolves khi connected
    */
-  async connect(tenantId, kitchenAreaId = null) {
+  async connect(tenantId) {
     // Prevent duplicate connection attempts
     if (this.connectInProgress) {
       console.log('Connection already in progress');
@@ -50,13 +48,13 @@ class KdsWebSocketService {
     }
 
     // If already connected with same parameters, return immediately
-    if (this.connected && this.tenantId === tenantId && this.kitchenAreaId === kitchenAreaId) {
+    if (this.connected && this.tenantId === tenantId) {
       console.log('Already connected with same parameters');
       return Promise.resolve();
     }
 
     // Disconnect any existing connection with different parameters
-    if (this.connected && (this.tenantId !== tenantId || this.kitchenAreaId !== kitchenAreaId)) {
+    if (this.connected && this.tenantId !== tenantId) {
       console.log('Disconnecting previous connection due to parameter change');
       this.disconnect();
     }
@@ -66,7 +64,6 @@ class KdsWebSocketService {
     this.connectionPromise = new Promise((resolve, reject) => {
       try {
         this.tenantId = tenantId;
-        this.kitchenAreaId = kitchenAreaId;
 
         this.client = new Client({
           // STOMP over SockJS (backend endpoint expects /ws/kds via SockJS)
@@ -124,7 +121,7 @@ class KdsWebSocketService {
 
     try {
       // Send subscription request tới backend
-      const destination = `/app/kds/subscribe/${this.tenantId}/${this.kitchenAreaId || 'ALL'}`;
+      const destination = `/app/kds/subscribe/${this.tenantId}`;
       
       console.log('Subscribing to:', destination);
       
@@ -132,34 +129,27 @@ class KdsWebSocketService {
         destination: destination,
         body: JSON.stringify({
           tenantId: this.tenantId,
-          kitchenAreaId: this.kitchenAreaId,
         }),
       });
 
-      // Subscribe tới topic để receive updates (bao gồm topic tenant chung và kitchen-area cụ thể)
-      const topicDestinations = this.buildTopicDestinations();
-      topicDestinations.forEach((topic) => {
-        console.log('Subscribing to topic:', topic);
+      // Subscribe tới topic để receive updates
+      const topic = `/topic/kds/${this.tenantId}`;
+      console.log('Subscribing to topic:', topic);
 
-        const subscription = this.client.subscribe(topic, (message) => {
-          try {
-            const payload = JSON.parse(message.body);
-            console.log('Received KDS update:', payload);
-            // Notify all registered handlers
-            this.messageHandlers.forEach((handler) => {
-              handler(payload);
-            });
-          } catch (error) {
-            console.error('Error parsing message:', error);
-          }
-        });
-
-        if (!this.subscription) {
-          this.subscription = [subscription];
-        } else {
-          this.subscription.push(subscription);
+      const subscription = this.client.subscribe(topic, (message) => {
+        try {
+          const payload = JSON.parse(message.body);
+          console.log('Received KDS update:', payload);
+          // Notify all registered handlers
+          this.messageHandlers.forEach((handler) => {
+            handler(payload);
+          });
+        } catch (error) {
+          console.error('Error parsing message:', error);
         }
       });
+
+      this.subscription = [subscription];
     } catch (error) {
       console.error('Error subscribing:', error);
     }
@@ -232,25 +222,6 @@ class KdsWebSocketService {
    */
   isConnected() {
     return this.connected && this.client && this.client.connected;
-  }
-
-  /**
-   * Build topic destination strings.
-   * - always subscribe tenant-wide topic `/topic/kds/{tenantId}`
-   * - if kitchenAreaId set and not ALL, also subscribe `/topic/kds/{tenantId}/{kitchenAreaId}`
-   * - if kitchenAreaId is ALL, subscribe `/topic/kds/{tenantId}/ALL` too for compatibility
-   *
-   * @private
-   * @returns {string[]}
-   */
-  buildTopicDestinations() {
-    const destinations = [`/topic/kds/${this.tenantId}`];
-    if (this.kitchenAreaId && this.kitchenAreaId !== 'ALL') {
-      destinations.push(`/topic/kds/${this.tenantId}/${this.kitchenAreaId}`);
-    } else {
-      destinations.push(`/topic/kds/${this.tenantId}/ALL`);
-    }
-    return destinations;
   }
 }
 

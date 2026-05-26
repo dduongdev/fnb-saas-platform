@@ -84,7 +84,6 @@ public class KdsRestController {
     @GetMapping("/sessions")
     @com.project.fnb.aspect.RequirePermission({
             com.project.fnb.aspect.OwnerPermissionValidator.class,
-            com.project.fnb.aspect.WaiterPermissionValidator.class,
             com.project.fnb.aspect.KitchenPermissionValidator.class
     })
     public ApiResponse<List<KdsSessionDto>> getSessions() {

@@ -36,12 +36,12 @@ import java.util.List;
  * 
  * <p><b>Topic Structure:</b></p>
  * <pre>
- *   /topic/kds/{tenantId}/{kitchenAreaId}
+ *   /topic/kds/{tenantId}
  * </pre>
- * Mỗi kitchen area có topic riêng để isolate dữ liệu.
+ * Mỗi tenant có 1 kitchen duy nhất nên topic chỉ cần phân chia theo tenantId.
  * 
  * @author FNB Team
- * @version 1.0
+ * @version 2.0
  */
 @Component
 @RequiredArgsConstructor
@@ -57,9 +57,8 @@ public class KdsEventPublisher {
      * <p><b>Frontend Action:</b> Thêm cột mới với thông tin session.</p>
      * 
      * @param session ServingSession vừa được tạo
-     * @param kitchenAreaId ID của kitchen area (có thể null → broadcast cho tất cả)
      */
-    public void publishSessionCreated(ServingSession session, String kitchenAreaId) {
+    public void publishSessionCreated(ServingSession session) {
         try {
             String tenantId = session.getTenantId();
             KdsSessionDto sessionDto = transformToDto(session);
@@ -71,13 +70,21 @@ public class KdsEventPublisher {
                     .timestamp(System.currentTimeMillis())
                     .build();
             
-            String destination = buildTopicDestination(tenantId, kitchenAreaId);
+            String destination = "/topic/kds/" + tenantId;
             messagingTemplate.convertAndSend(destination, payload);
             
             log.info("Published SESSION_CREATED event for session {} to {}", session.getId(), destination);
         } catch (Exception e) {
             log.error("Error publishing SESSION_CREATED event", e);
         }
+    }
+
+    /**
+     * @deprecated Use {@link #publishSessionCreated(ServingSession)} instead.
+     */
+    @Deprecated
+    public void publishSessionCreated(ServingSession session, String kitchenAreaId) {
+        publishSessionCreated(session);
     }
     
     /**
@@ -87,9 +94,8 @@ public class KdsEventPublisher {
      * 
      * @param sessionId ID của session bị hủy
      * @param tenantId Tenant ID
-     * @param kitchenAreaId ID của kitchen area
      */
-    public void publishSessionCancelled(Long sessionId, String tenantId, String kitchenAreaId) {
+    public void publishSessionCancelled(Long sessionId, String tenantId) {
         try {
             KdsUpdatePayload payload = KdsUpdatePayload.builder()
                     .eventType(KdsEventType.SESSION_CANCELLED)
@@ -97,13 +103,21 @@ public class KdsEventPublisher {
                     .timestamp(System.currentTimeMillis())
                     .build();
             
-            String destination = buildTopicDestination(tenantId, kitchenAreaId);
+            String destination = "/topic/kds/" + tenantId;
             messagingTemplate.convertAndSend(destination, payload);
             
             log.info("Published SESSION_CANCELLED event for session {} to {}", sessionId, destination);
         } catch (Exception e) {
             log.error("Error publishing SESSION_CANCELLED event", e);
         }
+    }
+
+    /**
+     * @deprecated Use {@link #publishSessionCancelled(Long, String)} instead.
+     */
+    @Deprecated
+    public void publishSessionCancelled(Long sessionId, String tenantId, String kitchenAreaId) {
+        publishSessionCancelled(sessionId, tenantId);
     }
     
     /**
@@ -113,9 +127,8 @@ public class KdsEventPublisher {
      * 
      * @param item OrderItem vừa được thêm
      * @param sessionId ID của session chứa item
-     * @param kitchenAreaId ID của kitchen area
      */
-    public void publishItemAdded(OrderItem item, Long sessionId, String kitchenAreaId) {
+    public void publishItemAdded(OrderItem item, Long sessionId) {
         try {
             String tenantId = item.getTenantId();
             KdsOrderItemDto itemDto = transformItemToDto(item);
@@ -127,13 +140,21 @@ public class KdsEventPublisher {
                     .timestamp(System.currentTimeMillis())
                     .build();
             
-            String destination = buildTopicDestination(tenantId, kitchenAreaId);
+            String destination = "/topic/kds/" + tenantId;
             messagingTemplate.convertAndSend(destination, payload);
             
             log.info("Published ITEM_ADDED event for item {} to {}", item.getId(), destination);
         } catch (Exception e) {
             log.error("Error publishing ITEM_ADDED event", e);
         }
+    }
+
+    /**
+     * @deprecated Use {@link #publishItemAdded(OrderItem, Long)} instead.
+     */
+    @Deprecated
+    public void publishItemAdded(OrderItem item, Long sessionId, String kitchenAreaId) {
+        publishItemAdded(item, sessionId);
     }
     
     /**
@@ -144,9 +165,8 @@ public class KdsEventPublisher {
      * @param itemId ID của OrderItem bị xóa
      * @param sessionId ID của session chứa item
      * @param tenantId Tenant ID
-     * @param kitchenAreaId ID của kitchen area
      */
-    public void publishItemRemoved(Long itemId, Long sessionId, String tenantId, String kitchenAreaId) {
+    public void publishItemRemoved(Long itemId, Long sessionId, String tenantId) {
         try {
             KdsUpdatePayload payload = KdsUpdatePayload.builder()
                     .eventType(KdsEventType.ITEM_REMOVED)
@@ -155,13 +175,21 @@ public class KdsEventPublisher {
                     .timestamp(System.currentTimeMillis())
                     .build();
             
-            String destination = buildTopicDestination(tenantId, kitchenAreaId);
+            String destination = "/topic/kds/" + tenantId;
             messagingTemplate.convertAndSend(destination, payload);
             
             log.info("Published ITEM_REMOVED event for item {} to {}", itemId, destination);
         } catch (Exception e) {
             log.error("Error publishing ITEM_REMOVED event", e);
         }
+    }
+
+    /**
+     * @deprecated Use {@link #publishItemRemoved(Long, Long, String)} instead.
+     */
+    @Deprecated
+    public void publishItemRemoved(Long itemId, Long sessionId, String tenantId, String kitchenAreaId) {
+        publishItemRemoved(itemId, sessionId, tenantId);
     }
     
     /**
@@ -171,9 +199,8 @@ public class KdsEventPublisher {
      * 
      * @param item OrderItem với status mới
      * @param sessionId ID của session chứa item
-     * @param kitchenAreaId ID của kitchen area
      */
-    public void publishItemStatusChanged(OrderItem item, Long sessionId, String kitchenAreaId) {
+    public void publishItemStatusChanged(OrderItem item, Long sessionId) {
         try {
             String tenantId = item.getTenantId();
             KdsOrderItemDto itemDto = transformItemToDto(item);
@@ -185,7 +212,7 @@ public class KdsEventPublisher {
                     .timestamp(System.currentTimeMillis())
                     .build();
             
-            String destination = buildTopicDestination(tenantId, kitchenAreaId);
+            String destination = "/topic/kds/" + tenantId;
             messagingTemplate.convertAndSend(destination, payload);
             
             log.info("Published ITEM_STATUS_CHANGED event for item {}", item.getId());
@@ -194,7 +221,21 @@ public class KdsEventPublisher {
         }
     }
 
-    public void publishItemUpdated(OrderItem item, Long sessionId, String kitchenAreaId) {
+    /**
+     * @deprecated Use {@link #publishItemStatusChanged(OrderItem, Long)} instead.
+     */
+    @Deprecated
+    public void publishItemStatusChanged(OrderItem item, Long sessionId, String kitchenAreaId) {
+        publishItemStatusChanged(item, sessionId);
+    }
+
+    /**
+     * Publish event khi OrderItem được cập nhật (VD: quantity thay đổi).
+     *
+     * @param item OrderItem đã cập nhật
+     * @param sessionId ID của session chứa item
+     */
+    public void publishItemUpdated(OrderItem item, Long sessionId) {
         try {
             String tenantId = item.getTenantId();
             KdsOrderItemDto itemDto = transformItemToDto(item);
@@ -206,7 +247,7 @@ public class KdsEventPublisher {
                     .timestamp(System.currentTimeMillis())
                     .build();
 
-            String destination = buildTopicDestination(tenantId, kitchenAreaId);
+            String destination = "/topic/kds/" + tenantId;
             messagingTemplate.convertAndSend(destination, payload);
 
             log.info("Published ITEM_UPDATED event for item {}", item.getId());
@@ -214,21 +255,13 @@ public class KdsEventPublisher {
             log.error("Error publishing ITEM_UPDATED event", e);
         }
     }
-    
+
     /**
-     * Build topic destination string: /topic/kds/{tenantId}/{kitchenAreaId}
-     * 
-     * <p>Nếu kitchenAreaId là null/empty, sẽ broadcast cho toàn tenant, để frontend filter.</p>
-     * 
-     * @param tenantId Tenant ID
-     * @param kitchenAreaId Kitchen Area ID (có thể null)
-     * @return Topic destination
+     * @deprecated Use {@link #publishItemUpdated(OrderItem, Long)} instead.
      */
-    private String buildTopicDestination(String tenantId, String kitchenAreaId) {
-        if (kitchenAreaId != null && !kitchenAreaId.isEmpty()) {
-            return "/topic/kds/" + tenantId + "/" + kitchenAreaId;
-        }
-        return "/topic/kds/" + tenantId;
+    @Deprecated
+    public void publishItemUpdated(OrderItem item, Long sessionId, String kitchenAreaId) {
+        publishItemUpdated(item, sessionId);
     }
     
     /**

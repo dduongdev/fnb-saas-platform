@@ -47,9 +47,9 @@ class KdsEventPublisherTest {
 
         ArgumentCaptor<KdsUpdatePayload> payloadCaptor = ArgumentCaptor.forClass(KdsUpdatePayload.class);
 
-        eventPublisher.publishSessionCreated(session, "kitchenX");
+        eventPublisher.publishSessionCreated(session);
 
-        verify(messagingTemplate).convertAndSend(eq("/topic/kds/tenant-1/kitchenX"), payloadCaptor.capture());
+        verify(messagingTemplate).convertAndSend(eq("/topic/kds/tenant-1"), payloadCaptor.capture());
         KdsUpdatePayload payload = payloadCaptor.getValue();
 
         assertNotNull(payload);
@@ -63,9 +63,9 @@ class KdsEventPublisherTest {
     void publishSessionCancelled_ShouldSendSessionCancelledEvent() {
         ArgumentCaptor<KdsUpdatePayload> payloadCaptor = ArgumentCaptor.forClass(KdsUpdatePayload.class);
 
-        eventPublisher.publishSessionCancelled(999L, "tenant-2", "kitchenA");
+        eventPublisher.publishSessionCancelled(999L, "tenant-2");
 
-        verify(messagingTemplate).convertAndSend(eq("/topic/kds/tenant-2/kitchenA"), payloadCaptor.capture());
+        verify(messagingTemplate).convertAndSend(eq("/topic/kds/tenant-2"), payloadCaptor.capture());
         KdsUpdatePayload payload = payloadCaptor.getValue();
 
         assertNotNull(payload);
@@ -90,9 +90,9 @@ class KdsEventPublisherTest {
 
         ArgumentCaptor<KdsUpdatePayload> payloadCaptor = ArgumentCaptor.forClass(KdsUpdatePayload.class);
 
-        eventPublisher.publishItemAdded(item, 88L, "kitchenB");
+        eventPublisher.publishItemAdded(item, 88L);
 
-        verify(messagingTemplate).convertAndSend(eq("/topic/kds/tenant-3/kitchenB"), payloadCaptor.capture());
+        verify(messagingTemplate).convertAndSend(eq("/topic/kds/tenant-3"), payloadCaptor.capture());
         KdsUpdatePayload payload = payloadCaptor.getValue();
 
         assertNotNull(payload);

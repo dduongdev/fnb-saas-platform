@@ -21,8 +21,18 @@ public class RequirePermissionAspect {
     @Autowired
     private ApplicationContext applicationContext;
 
-    @Around("@annotation(requirePermission)")
-    public Object around(ProceedingJoinPoint joinPoint, RequirePermission requirePermission) throws Throwable {
+    @Around("@within(com.project.fnb.aspect.RequirePermission) || @annotation(com.project.fnb.aspect.RequirePermission)")
+    public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
+        org.aspectj.lang.reflect.MethodSignature signature = (org.aspectj.lang.reflect.MethodSignature) joinPoint.getSignature();
+        RequirePermission requirePermission = org.springframework.core.annotation.AnnotationUtils.findAnnotation(signature.getMethod(), RequirePermission.class);
+        if (requirePermission == null) {
+            requirePermission = org.springframework.core.annotation.AnnotationUtils.findAnnotation(joinPoint.getTarget().getClass(), RequirePermission.class);
+        }
+        
+        if (requirePermission == null) {
+            return joinPoint.proceed();
+        }
+
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String tenantId = TenantContext.getTenantId();
 

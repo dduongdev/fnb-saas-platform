@@ -20,30 +20,29 @@ import java.util.List;
  * <p><b>Message Flow:</b></p>
  * <pre>
  * Client:
- *   SUBSCRIBE /app/kds/subscribe/{tenantId}/{kitchenAreaId}
+ *   SUBSCRIBE /app/kds/subscribe/{tenantId}
  *   ↓
  * Server (KdsWebSocketController):
  *   handleSubscribe() receives & validates subscription
  *   ↓
  *   Calls KdsService.getAllActiveSessions()
  *   ↓
- *   Sends initial data to /topic/kds/{tenantId}/{kitchenAreaId}
+ *   Sends initial data to /topic/kds/{tenantId}
  *   ↓
- *   Client automatically subscribed to /topic/kds/{tenantId}/{kitchenAreaId}
+ *   Client automatically subscribed to /topic/kds/{tenantId}
  *   receives all future updates via KdsEventPublisher
  * </pre>
  * 
  * <p><b>Endpoints:</b></p>
  * <ul>
- *   <li>SUBSCRIBE: /app/kds/subscribe/{tenantId}/{kitchenAreaId}</li>
- *   <li>Topic (Server → Client): /topic/kds/{tenantId}/{kitchenAreaId}</li>
+ *   <li>SUBSCRIBE: /app/kds/subscribe/{tenantId}</li>
+ *   <li>Topic (Server → Client): /topic/kds/{tenantId}</li>
  * </ul>
  * 
- * <p><b>Note:</b> STOMP subscription returns no response automatically.
- * Our handleSubscribe() explicitly sends initial data via messagingTemplate.convertAndSend().</p>
+ * <p><b>Note:</b> Mỗi tenant chỉ có 1 kitchen duy nhất, nên topic được phân chia theo tenantId.</p>
  * 
  * @author FNB Team
- * @version 1.0
+ * @version 2.0
  */
 @Controller
 @RequiredArgsConstructor
@@ -58,35 +57,26 @@ public class KdsWebSocketController {
      * 
      * <p><b>Khi client kết nối:</b></p>
      * <ol>
-     *   <li>Client gửi SUBSCRIBE message tới /app/kds/subscribe/{tenantId}/{kitchenAreaId}</li>
+     *   <li>Client gửi SUBSCRIBE message tới /app/kds/subscribe/{tenantId}</li>
      *   <li>Spring routes tới method này</li>
      *   <li>Method lấy tất cả active sessions từ KdsService</li>
-     *   <li>Send initial data tới /topic/kds/{tenantId}/{kitchenAreaId}</li>
+     *   <li>Send initial data tới /topic/kds/{tenantId}</li>
      *   <li>Client tự động nhận được message này (vì đã subscribe tới topic)</li>
      *   <li>Các event update sau này sẽ được gửi bởi KdsEventPublisher</li>
      * </ol>
      * 
-     * <p><b>Parameters:</b></p>
-     * <ul>
-     *   <li>{@code tenantId} - Tenant ID để isolate dữ liệu</li>
-     *   <li>{@code kitchenAreaId} - Optional kitchen area ID (có thể null)</li>
-     * </ul>
-     * 
-     * @param tenantId          Tenant ID
-     * @param kitchenAreaId     Kitchen Area ID (tùy chọn)
+     * @param tenantId Tenant ID
      */
-    @MessageMapping("/kds/subscribe/{tenantId}/{kitchenAreaId}")
+    @MessageMapping("/kds/subscribe/{tenantId}")
     @com.project.fnb.aspect.RequirePermission({
             com.project.fnb.aspect.OwnerPermissionValidator.class,
-            com.project.fnb.aspect.KitchenPermissionValidator.class,
-            com.project.fnb.aspect.WaiterPermissionValidator.class
+            com.project.fnb.aspect.KitchenPermissionValidator.class
     })
     public void handleSubscribe(
-            @DestinationVariable String tenantId,
-            @DestinationVariable String kitchenAreaId) {
+            @DestinationVariable String tenantId) {
         
         try {
-            log.info("Client subscribed to KDS: tenantId={}, kitchenAreaId={}", tenantId, kitchenAreaId);
+            log.info("Client subscribed to KDS: tenantId={}", tenantId);
             
             // Thiết lập tenant context cho WebSocket message (quan trọng để filter multi-tenant)
             com.project.fnb.infrastructure.security.TenantContext.setTenantId(tenantId);
@@ -102,7 +92,7 @@ public class KdsWebSocketController {
                     .build();
             
             // Gửi initial data tới topic
-            String destination = buildTopicDestination(tenantId, kitchenAreaId);
+            String destination = "/topic/kds/" + tenantId;
             messagingTemplate.convertAndSend(destination, payload);
             
             log.info("Sent initial KDS data ({} sessions) to {}", sessions.size(), destination);
@@ -112,24 +102,5 @@ public class KdsWebSocketController {
             // Xóa TenantContext để tránh leak giữa các kết nối websocket khác nhau
             com.project.fnb.infrastructure.security.TenantContext.clear();
         }
-    }
-    
-    /**
-     * Build topic destination string: /topic/kds/{tenantId}/{kitchenAreaId}
-     * 
-     * <p>Nếu kitchenAreaId là null, tạo topic cho toàn tenant.</p>
-     * 
-     * @param tenantId Tenant ID
-     * @param kitchenAreaId Kitchen Area ID (có thể null)
-     * @return Topic destination
-     */
-    private String buildTopicDestination(String tenantId, String kitchenAreaId) {
-        if (kitchenAreaId != null && !kitchenAreaId.isEmpty() && !"null".equals(kitchenAreaId)) {
-            if ("ALL".equalsIgnoreCase(kitchenAreaId)) {
-                return "/topic/kds/" + tenantId;
-            }
-            return "/topic/kds/" + tenantId + "/" + kitchenAreaId;
-        }
-        return "/topic/kds/" + tenantId;
     }
 }

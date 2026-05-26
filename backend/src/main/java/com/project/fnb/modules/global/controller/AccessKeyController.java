@@ -15,6 +15,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/tenants/{tenantId}/access-keys")
 @RequiredArgsConstructor
+@com.project.fnb.aspect.RequirePermission(com.project.fnb.aspect.OwnerPermissionValidator.class)
 public class AccessKeyController {
 
     private final AccessKeyService accessKeyService;

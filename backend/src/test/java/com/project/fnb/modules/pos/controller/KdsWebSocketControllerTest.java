@@ -37,17 +37,17 @@ class KdsWebSocketControllerTest {
     }
 
     @Test
-    void handleSubscribe_ShouldSendInitialPayload_ToSpecificKitchenArea() {
+    void handleSubscribe_ShouldSendInitialPayload_ToTenantKitchen() {
         KdsSessionDto session = KdsSessionDto.builder().sessionId(1L).tableNames("Bàn 1").build();
         when(kdsService.getAllActiveSessions()).thenReturn(List.of(session));
 
-        controller.handleSubscribe("tenant-1", "kitchen-a");
+        controller.handleSubscribe("tenant-1");
 
         ArgumentCaptor<String> destinationCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
         verify(messagingTemplate).convertAndSend(destinationCaptor.capture(), payloadCaptor.capture());
 
-        assertEquals("/topic/kds/tenant-1/kitchen-a", destinationCaptor.getValue());
+        assertEquals("/topic/kds/tenant-1", destinationCaptor.getValue());
         assertInstanceOf(KdsUpdatePayload.class, payloadCaptor.getValue());
 
         KdsUpdatePayload payload = (KdsUpdatePayload) payloadCaptor.getValue();
@@ -58,20 +58,10 @@ class KdsWebSocketControllerTest {
     }
 
     @Test
-    void handleSubscribe_ShouldSendToTenantTopic_WhenKitchenAreaAll() {
-        when(kdsService.getAllActiveSessions()).thenReturn(List.of());
-
-        controller.handleSubscribe("tenant-1", "ALL");
-
-        verify(messagingTemplate).convertAndSend(eq("/topic/kds/tenant-1"), any(KdsUpdatePayload.class));
-        assertNull(TenantContext.getTenantId());
-    }
-
-    @Test
     void handleSubscribe_ShouldClearTenantContext_WhenServiceThrows() {
         when(kdsService.getAllActiveSessions()).thenThrow(new RuntimeException("ws-fail"));
 
-        controller.handleSubscribe("tenant-1", "kitchen-a");
+        controller.handleSubscribe("tenant-1");
 
         verify(messagingTemplate, never()).convertAndSend(anyString(), any(KdsUpdatePayload.class));
         assertNull(TenantContext.getTenantId());
