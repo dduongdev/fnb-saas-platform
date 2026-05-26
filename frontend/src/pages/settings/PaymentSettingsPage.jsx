@@ -5,7 +5,7 @@ import { PageLayout } from '../../components/layout';
 import { Button, Card, CardHeader, CardTitle, CardContent, Input, Loading } from '../../components/common';
 import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
-import { getTenantDetail, updatePaymentConfig } from '../../api/tenant';
+import { getPaymentConfig, updatePaymentConfig } from '../../api/tenant';
 import './PaymentSettingsPage.css';
 
 export function PaymentSettingsPage() {
@@ -44,15 +44,15 @@ export function PaymentSettingsPage() {
     const loadConfig = async () => {
         try {
             setLoading(true);
-            // Re-fetch tenant detail to get latest config
-            const data = await getTenantDetail(tenant.id);
+            // Fetch payment config directly from secure endpoint
+            const paymentConfig = await getPaymentConfig(tenant.id);
 
-            if (data.paymentConfig) {
+            if (paymentConfig) {
                 // Merge with default structure to ensure all fields exist
                 setConfig(prev => ({
-                    vnpay: { ...prev.vnpay, ...data.paymentConfig.vnpay },
-                    momo: { ...prev.momo, ...data.paymentConfig.momo },
-                    paypal: { ...prev.paypal, ...data.paymentConfig.paypal }
+                    vnpay: { ...prev.vnpay, ...paymentConfig.vnpay },
+                    momo: { ...prev.momo, ...paymentConfig.momo },
+                    paypal: { ...prev.paypal, ...paymentConfig.paypal }
                 }));
             }
         } catch (error) {

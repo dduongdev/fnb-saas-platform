@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Loading, Button } from '../../components/common';
 import { useToast } from '../../context/ToastContext';
 import { getPublicMenu, getTableInfo } from '../../api/pos';
-import { getTenantDetail } from '../../api/tenant';
+import { getPublicTenantDetail } from '../../api/tenant';
 import { createCustomerOrder, getCustomerOrderStatus, addCustomerItems, removeCustomerItem } from '../../api/session';
 import { getPublicPaymentMethods, requestPayment, createPaymentUrl } from '../../api/payment';
 import { usePublicTableWebSocket } from '../../hooks/useWebSocket';
@@ -341,7 +341,7 @@ export function CustomerMenuPage() {
                 }
             } else if (tenantId) {
                 // Demo route (from /shops list) - no table info call
-                const tenant = await getTenantDetail(tenantId);
+                const tenant = await getPublicTenantDetail(tenantId);
                 setTableInfo({
                     tenantName: tenant.name || 'Menu quán',
                     tableName: 'Xem menu demo',

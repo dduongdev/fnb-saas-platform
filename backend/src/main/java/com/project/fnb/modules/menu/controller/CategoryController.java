@@ -2,6 +2,7 @@ package com.project.fnb.modules.menu.controller;
 
 import com.project.fnb.aspect.OwnerPermissionValidator;
 import com.project.fnb.aspect.RequirePermission;
+import com.project.fnb.aspect.WaiterPermissionValidator;
 import com.project.fnb.common.dto.ApiResponse;
 import com.project.fnb.modules.menu.dto.CategoryDto;
 import com.project.fnb.modules.menu.entity.Category;
@@ -20,6 +21,7 @@ public class CategoryController {
     private final CategoryService categoryService;
 
     @GetMapping
+    @RequirePermission({OwnerPermissionValidator.class, WaiterPermissionValidator.class})
     public ApiResponse<List<CategoryDto>> getCategories() {
         List<Category> categories = categoryService.getCategories();
         List<CategoryDto> dtos = categories.stream().map(c -> CategoryDto.builder()

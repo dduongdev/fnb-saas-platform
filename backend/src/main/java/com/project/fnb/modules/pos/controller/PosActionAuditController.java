@@ -18,7 +18,7 @@ public class PosActionAuditController {
     private final PosActionAuditService auditService;
 
     @GetMapping
-    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class, com.project.fnb.aspect.WaiterPermissionValidator.class})
+    @com.project.fnb.aspect.RequirePermission(com.project.fnb.aspect.OwnerPermissionValidator.class)
     public ApiResponse<Page<PosActionAudit>> getAuditEvents(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Utensils, X } from 'lucide-react';
 import { Loading, Card, Button, Empty } from '../../components/common';
 import { getPublicMenu } from '../../api/pos';
-import { getTenantDetail } from '../../api/tenant';
+import { getPublicTenantDetail } from '../../api/tenant';
 import { formatPrice } from '../../utils/format';
 import './MenuPage.css';
 
@@ -21,7 +21,7 @@ export function MenuPage() {
             try {
                 setLoading(true);
                 const [tenantData, menuData] = await Promise.all([
-                    getTenantDetail(tenantId),
+                    getPublicTenantDetail(tenantId),
                     getPublicMenu(tenantId),
                 ]);
 

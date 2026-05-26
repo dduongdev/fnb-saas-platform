@@ -2,6 +2,7 @@ package com.project.fnb.modules.menu.controller;
 
 import com.project.fnb.aspect.OwnerPermissionValidator;
 import com.project.fnb.aspect.RequirePermission;
+import com.project.fnb.aspect.WaiterPermissionValidator;
 import com.project.fnb.common.dto.ApiResponse;
 import com.project.fnb.modules.menu.dto.ProductResponse;
 import com.project.fnb.modules.menu.entity.Product;
@@ -29,6 +30,7 @@ public class ProductController {
      * Hỗ trợ filter theo categoryId và status.
      */
     @GetMapping
+    @RequirePermission({OwnerPermissionValidator.class, WaiterPermissionValidator.class})
     public ApiResponse<Page<ProductResponse>> getProducts(
             @RequestParam(required = false) Integer categoryId,
             @RequestParam(required = false) Product.ProductStatus status,
@@ -40,6 +42,7 @@ public class ProductController {
     }
 
     @GetMapping("/{id}")
+    @RequirePermission({OwnerPermissionValidator.class, WaiterPermissionValidator.class})
     public ApiResponse<ProductResponse> getDetail(@PathVariable Long id) {
         return ApiResponse.success(productService.getProductDetail(id));
     }

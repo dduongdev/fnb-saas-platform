@@ -52,5 +52,6 @@ public class Tenant {
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "tenant_access_keys", joinColumns = @JoinColumn(name = "tenant_id"))
     @Column(name = "access_key", length = 64)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<String> accessKeys;
 }

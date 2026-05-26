@@ -124,22 +124,6 @@ public class TenantController {
     
     /**
      * Lấy chi tiết thông tin của một tenant cụ thể.
-     * 
-     * <p>Endpoint này lấy và trả về chi tiết đầy đủ của một tenant theo ID.
-     * Endpoint này là PUBLIC (không yêu cầu JWT token), cho phép frontend
-     * lấy thông tin chi tiết tenant để display truyền hình (banner, logo, v.v.)</p>
-     * 
-     * <p><b>Authorization:</b></p>
-     * <ul>
-     *   <li>Endpoint này là PUBLIC - không yêu cầu JWT token</li>
-     *   <li>Bất kỳ ai cũng có thể lấy chi tiết tenant</li>
-     * </ul>
-     * 
-     * @param id ID của tenant cần lấy chi tiết (path parameter, bắt buộc)
-     * 
-     * @return ApiResponse<Tenant> chứa chi tiết thông tin tenant
-     * @throws RuntimeException("Tenant not found") nếu tenant không tồn tại
-     * @see TenantService#getTenantDetail(String)
      */
     @GetMapping("/{id}")
     public ApiResponse<Tenant> getTenantDetail(@PathVariable String id) {
@@ -168,5 +152,26 @@ public class TenantController {
         String userId = jwt.getSubject();
         tenantService.updatePaymentConfig(id, config, userId);
         return ApiResponse.success("Cập nhật cấu hình thanh toán thành công");
+    }
+
+    /**
+     * Lấy cấu hình thanh toán của tenant (Owner-only).
+     * 
+     * <p><b>Security:</b> Chỉ Owner mới có thể đọc cấu hình thanh toán.
+     * Secret keys vẫn được ẩn bởi @JsonProperty(WRITE_ONLY), 
+     * nhưng enabled status và non-secret fields sẽ được trả về.</p>
+     */
+    @GetMapping("/{id}/payment-config")
+    @com.project.fnb.aspect.RequirePermission({com.project.fnb.aspect.OwnerPermissionValidator.class})
+    public ApiResponse<PaymentConfigDto> getPaymentConfig(
+            @PathVariable String id,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        String userId = jwt.getSubject();
+        Tenant tenant = tenantService.getTenantDetail(id);
+        if (!tenant.getOwnerId().equals(userId)) {
+            throw new com.project.fnb.common.exception.AppException(403, "Bạn không có quyền xem cấu hình này");
+        }
+        return ApiResponse.success(tenant.getPaymentConfig() != null ? tenant.getPaymentConfig() : new PaymentConfigDto());
     }
 }

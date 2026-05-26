@@ -39,4 +39,17 @@ public class PublicTenantController {
 
         return ApiResponse.success(dtoPage);
     }
+
+    @GetMapping("/{id}")
+    public ApiResponse<TenantPublicDto> getPublicTenantDetail(@org.springframework.web.bind.annotation.PathVariable String id) {
+        Tenant t = tenantRepository.findById(id)
+                .orElseThrow(() -> new com.project.fnb.common.exception.AppException(404, "Quán không tồn tại"));
+        TenantPublicDto dto = TenantPublicDto.builder()
+                .id(t.getId())
+                .name(t.getName())
+                .address(t.getAddress())
+                .logoUrl(t.getLogoUrl())
+                .build();
+        return ApiResponse.success(dto);
+    }
 }

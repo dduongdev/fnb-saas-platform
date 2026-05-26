@@ -28,6 +28,7 @@ public class PaymentConfigDto {
         private String tmnCode;
         
         // HashSecret: Chuỗi bí mật để tạo checksum
+        @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
         private String hashSecret;
         
         private Boolean enabled;
@@ -39,7 +40,9 @@ public class PaymentConfigDto {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class MomoConfig {
         private String partnerCode;
+        @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
         private String accessKey;
+        @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
         private String secretKey;
         private Boolean enabled;
     }
@@ -50,6 +53,7 @@ public class PaymentConfigDto {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class PayPalConfig {
         private String clientId;
+        @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
         private String clientSecret;
         private String mode; // sandbox / live
         private Boolean enabled;

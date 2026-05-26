@@ -3,8 +3,14 @@ import { api, uploadFile } from './client';
 // Get my tenants (user's own shops)
 export const getMyTenants = () => api.get('/api/tenants/me', { skipTenant: true });
 
-// Get tenant detail
+// Get tenant detail (authenticated)
 export const getTenantDetail = (id) => api.get(`/api/tenants/${id}`, { skipTenant: true });
+
+// Get public tenant detail (unauthenticated, safe DTO)
+export const getPublicTenantDetail = (id) => api.get(`/api/public/tenants/${id}`, { skipTenant: true });
+
+// Get payment config (owner only)
+export const getPaymentConfig = (id) => api.get(`/api/tenants/${id}/payment-config`, { skipTenant: true });
 
 // Create new tenant
 export const createTenant = (name, address, logo) => {
@@ -25,11 +31,17 @@ export const updateTenant = (id, name, address, logo) => {
     if (logo) formData.append('logo', logo);
 
     const token = localStorage.getItem('access_token');
+    const tenantId = localStorage.getItem('tenant_id');
+    const headers = {
+        'Authorization': `Bearer ${token}`,
+    };
+    if (tenantId) {
+        headers['X-Tenant-ID'] = tenantId;
+    }
+
     return fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8081'}/api/tenants/${id}`, {
         method: 'PUT',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-        },
+        headers,
         body: formData,
     }).then(res => res.json()).then(data => {
         if (data.code !== 200) throw new Error(data.message);
@@ -39,11 +51,11 @@ export const updateTenant = (id, name, address, logo) => {
 
 // Update tenant status
 export const updateTenantStatus = (id, isActive) =>
-    api.patch(`/api/tenants/${id}/status?isActive=${isActive}`, null, { skipTenant: true });
+    api.patch(`/api/tenants/${id}/status?isActive=${isActive}`);
 
 // Update payment config
 export const updatePaymentConfig = (id, config) =>
-    api.put(`/api/tenants/${id}/payment-config`, config, { skipTenant: true });
+    api.put(`/api/tenants/${id}/payment-config`, config);
 
 // Get public tenants list
 export const getPublicTenants = (page = 0, size = 10) =>
