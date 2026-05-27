@@ -1,0 +1,62 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [ develop ]
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy to Staging
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+
+      - name: Build backend (skip tests)
+        run: |
+          chmod +x backend/mvnw
+          ./backend/mvnw -f backend -DskipTests package
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            backend/target/*.jar
+            frontend/dist/**
+
+      - name: Deploy to staging via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_SSH_PORT || '22' }}
+          script: |
+            set -e
+            cd /home/${{ secrets.STAGING_SSH_USER }} || exit 1
+            if [ -x ./infra/scripts/deploy_to_staging.sh ]; then
+              ./infra/scripts/deploy_to_staging.sh
+            else
+              echo "deploy script not found on host: infra/scripts/deploy_to_staging.sh"
+              exit 2
+            fi
