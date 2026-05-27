@@ -54,6 +54,43 @@ docker run --rm -i `
 
 Local sanity stress suggestion: set `STRESS_SCALE=0.1`.
 
+## Run stress on GCloud VM
+
+If you want to host a single load-generator machine on GCloud, use an E2 custom VM sized at 16 vCPU and 16 GB RAM. If you are thinking in CPU cores, that maps to 8 physical cores with SMT on many VM shapes. On GCP, this is typically created as `e2-custom-16-16384`.
+
+```powershell
+gcloud compute instances create k6-host-1 `
+  --zone=asia-southeast1-b `
+  --machine-type=e2-custom-16-16384 `
+  --image-family=ubuntu-2204-lts `
+  --image-project=ubuntu-os-cloud `
+  --boot-disk-size=50GB
+```
+
+Then SSH into the VM, install Docker, copy this repo, and run:
+
+```bash
+docker run --rm -i \
+  -e BASE_URL=http://<backend-ip>:8081 \
+  -e TEST_PROFILE=stress \
+  -e DATA_FILE=/work/backend/k6_data.json \
+  -e STRESS_SCALE=1 \
+  -e STRICT_MODE=false \
+  -v /path/to/fnb-saas-platform:/work \
+  grafana/k6 run /work/backend/k6_load_test.js
+```
+
+## Full-session hardware capture
+
+If you want CPU and RAM usage for the whole test window, start the system metrics collector on the host before booting the backend and stop it after the test completes. The repo includes a reusable collector at `infra/scripts/collect_system_metrics.sh` plus systemd units for host and runner:
+
+- `infra/systemd/host-metrics.service`
+- `infra/systemd/runner-metrics.service`
+
+The collector writes timestamped snapshots with `uptime`, `free -h`, and `docker stats --no-stream` into a log file so you can review the full session, not just a single snapshot.
+
+If you truly need 16 vCPU on GCloud, the memory footprint will be higher than 16 GB on E2; in that case, pick a larger machine family or a custom machine that matches the target RAM.
+
 ## Notes
 
 - The script creates dedicated test user, tenant, tables, and products in `setup()`.

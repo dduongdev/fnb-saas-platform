@@ -3,17 +3,32 @@ import { check, group, sleep, fail } from 'k6';
 import exec from 'k6/execution';
 import { SharedArray } from 'k6/data';
 import { Counter, Rate } from 'k6/metrics';
+import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 
-const BASE_URL = (__ENV.BASE_URL || 'http://localhost:8081').replace(/\/$/, '');
+const BASE_URL = (__ENV.BASE_URL || 'http://34.2.140.241:8081').replace(/\/$/, '');
 const DATA_FILE = __ENV.DATA_FILE || './k6_data.json';
 const PROFILE = (__ENV.TEST_PROFILE || 'stress').toLowerCase();
 const IS_SMOKE = PROFILE === 'smoke';
+const IS_SOAK = PROFILE === 'soak';
 const STRESS_SCALE = Math.max(0.05, Number(__ENV.STRESS_SCALE || '1'));
+const STRESS_GROUP_ORDER_SCALE = Math.max(0.1, Number(__ENV.GROUP_ORDER_SCALE || '1.4'));
+const STRESS_CONCURRENT_TABLE_OPS_SCALE = Math.max(0.1, Number(__ENV.CONCURRENT_TABLE_OPS_SCALE || '1.5'));
+const SOAK_DURATION = __ENV.SOAK_DURATION || '2h';
 const STRICT_MODE = (__ENV.STRICT_MODE || (IS_SMOKE ? 'true' : 'false')).toLowerCase() === 'true';
 const GROUP_SIZE_TARGET = Math.max(3, Math.min(5, Number(__ENV.GROUP_SIZE_TARGET || '4')));
+const BASE_GROUP_ORDER_STAGES = [55, 107, 160];
+const BASE_CONCURRENT_TABLE_OPS_VUS = 68;
+const BASE_MAX_VUS = 228;
+const STRESS_GROUP_ORDER_STAGES = BASE_GROUP_ORDER_STAGES.map(function (stageTarget) {
+  return Math.max(1, Math.round(stageTarget * STRESS_GROUP_ORDER_SCALE));
+});
+const STRESS_CONCURRENT_TABLE_OPS_VUS = Math.max(GROUP_SIZE_TARGET, Math.round(BASE_CONCURRENT_TABLE_OPS_VUS * STRESS_CONCURRENT_TABLE_OPS_SCALE));
+const STRESS_MAX_VUS = Math.max(BASE_MAX_VUS, STRESS_GROUP_ORDER_STAGES[2] + STRESS_CONCURRENT_TABLE_OPS_VUS);
 const CONCURRENT_TABLE_VUS = IS_SMOKE
   ? GROUP_SIZE_TARGET
-  : Math.max(GROUP_SIZE_TARGET, scaleTarget(25));
+  : IS_SOAK
+    ? Math.max(GROUP_SIZE_TARGET, scaleTarget(41))
+    : STRESS_CONCURRENT_TABLE_OPS_VUS;
 const CONCURRENT_TABLE_ITERATIONS = IS_SMOKE
   ? 3
   : Math.max(3, scaleTarget(12));
@@ -47,6 +62,28 @@ function scaleTarget(value) {
   return Math.max(1, Math.floor(value * STRESS_SCALE));
 }
 
+function increaseByThirtyPercent(value) {
+  return Math.max(1, Math.ceil(value * 1.3));
+}
+
+function increaseByTwentyPercent(value) {
+  return Math.max(1, Math.ceil(value * 1.2));
+}
+
+function soakTarget(value) {
+  return Math.max(1, Math.round(value * 0.6));
+}
+
+function soakRampStages() {
+  return [
+    { duration: '10m', target: scaleTarget(soakTarget(55)) },
+    { duration: '10m', target: scaleTarget(soakTarget(107)) },
+    { duration: '10m', target: scaleTarget(soakTarget(160)) },
+    { duration: SOAK_DURATION, target: scaleTarget(soakTarget(160)) },
+    { duration: '10m', target: 0 },
+  ];
+}
+
 export const options = {
   discardResponseBodies: true,
   summaryTrendStats: ['avg', 'med', 'p(90)', 'p(95)', 'p(99)', 'max'],
@@ -67,15 +104,31 @@ export const options = {
           startTime: '0s',
         },
       }
+    : IS_SOAK
+    ? {
+        group_order: {
+          executor: 'ramping-vus',
+          exec: 'groupOrderFlow',
+          startVUs: 0,
+          stages: soakRampStages(),
+        },
+        concurrent_table_ops: {
+          executor: 'constant-vus',
+          exec: 'concurrentTableOperations',
+          vus: CONCURRENT_TABLE_VUS,
+          duration: SOAK_DURATION,
+          startTime: '30s',
+        },
+      }
     : {
         group_order: {
           executor: 'ramping-vus',
           exec: 'groupOrderFlow',
           startVUs: 0,
           stages: [
-            { duration: '60s', target: scaleTarget(20) },
-            { duration: '120s', target: scaleTarget(40) },
-            { duration: '180s', target: scaleTarget(60) },
+            { duration: '60s', target: STRESS_GROUP_ORDER_STAGES[0] },
+            { duration: '120s', target: STRESS_GROUP_ORDER_STAGES[1] },
+            { duration: '180s', target: STRESS_GROUP_ORDER_STAGES[2] },
             { duration: '120s', target: 0 },
           ],
         },
@@ -168,7 +221,7 @@ function randomFrom(list) {
 
 function buildTableSeedNames() {
   // Keep table pool larger than max concurrent VUs so each VU can stick to a dedicated table.
-  const desired = IS_SMOKE ? 8 : Math.max(60, scaleTarget(160));
+  const desired = IS_SMOKE ? 8 : Math.max(60, IS_SOAK ? scaleTarget(160) : STRESS_MAX_VUS);
   const names = [];
   for (let i = 0; i < desired; i += 1) {
     names.push(`${TABLE_NAMES[i % TABLE_NAMES.length]}-${String(i + 1).padStart(3, '0')}`);
@@ -303,8 +356,12 @@ export function setup() {
   }
   if (!productIds.length) fail('cannot create any product');
 
-  const stressMaxVus = scaleTarget(60);
-  const desiredSessionGroups = IS_SMOKE ? 1 : Math.max(1, Math.floor(stressMaxVus / GROUP_SIZE_TARGET));
+  const activeMaxVus = IS_SMOKE
+    ? GROUP_SIZE_TARGET
+    : IS_SOAK
+      ? scaleTarget(soakTarget(160))
+      : STRESS_MAX_VUS;
+  const desiredSessionGroups = IS_SMOKE ? 1 : Math.max(1, Math.floor(activeMaxVus / GROUP_SIZE_TARGET));
   const groupSessionCount = Math.min(desiredSessionGroups, tableIds.length);
 
   const sharedSessionIds = [];
@@ -735,4 +792,43 @@ export function fullPosFlow(data) {
 
 export default function () {
   fail('Use named scenarios only.');
+}
+
+export function handleSummary(data) {
+  return {
+    'summary.json': JSON.stringify(data, null, 2),
+    'summary.html': `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>k6 Summary</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #111827;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 16px;
+      overflow: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>k6 Summary</h1>
+  <pre>${textSummary(data, { indent: '  ', enableColors: false })}</pre>
+</body>
+</html>
+`.trim(),
+    stdout: textSummary(data, { indent: ' ', enableColors: true }),
+  };
 }
