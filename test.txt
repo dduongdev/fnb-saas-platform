@@ -1,0 +1,12 @@
+========================================
+  FNB SaaS Platform — CI/CD Test File
+========================================
+
+Created: 2026-06-03
+Purpose: Trigger GitHub Actions pipeline
+
+This file is used to verify the CI/CD workflow:
+  - Push to staging   → Deploy to fnb-staging-vm (Test)
+  - Push to production → Deploy to fnb-production-vm (Prod)
+
+Status: ✅ Initial test
