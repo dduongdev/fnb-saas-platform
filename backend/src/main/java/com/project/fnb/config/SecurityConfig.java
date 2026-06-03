@@ -83,6 +83,48 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        // Static resources (React SPA)
+                        .requestMatchers(
+                                "/",
+                                "/index.html",
+                                "/assets/**",
+                                "/favicon.ico",
+                                "/logo.svg",
+                                "/manifest.json")
+                        .permitAll()
+                        // SPA client-side routes — cho phép React Router xử lý
+                        // Match các path không phải API/actuator/ws/assets
+                        .requestMatchers(HttpMethod.GET,
+                                "/",
+                                "/login",
+                                "/register",
+                                "/shops",
+                                "/access-key-login",
+                                "/dashboard",
+                                "/dashboard/**",
+                                "/pos",
+                                "/pos/**",
+                                "/tables",
+                                "/tables/**",
+                                "/table/**",
+                                "/sessions",
+                                "/sessions/**",
+                                "/menu/**",
+                                "/products",
+                                "/products/**",
+                                "/categories",
+                                "/categories/**",
+                                "/reports",
+                                "/reports/**",
+                                "/settings",
+                                "/settings/**",
+                                "/notifications",
+                                "/notifications/**",
+                                "/customer/**",
+                                "/kds",
+                                "/kds/**")
+                        .permitAll()
+                        // Public API endpoints
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",

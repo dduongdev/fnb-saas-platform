@@ -34,12 +34,13 @@ services:
       - fnb-net
 
   # ------------------------------------
-  # 2. APP BACKEND SERVICE
+  # 2. APP SERVICE (Backend + Frontend)
+  # Frontend được build trong Dockerfile và serve bởi Spring Boot
   # ------------------------------------
   backend:
     build:
-      context: ./backend 
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "8081:8081"
     env_file:
